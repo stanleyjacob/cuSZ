@@ -5,13 +5,18 @@
 #CXX       := clang++ -fPIE
 CXX       := g++
 NVCC      := nvcc
+<<<<<<< HEAD
 STD       := -std=c++14
+=======
+STD       := -std=c++11
+>>>>>>> add "Huffman (re)"
 HOST_DBG  := -O0 -g
 CUDA_DBG  := -O0 -G -g
 SRC_DIR   := src
 OBJ_DIR   := src
 BIN_DIR   := bin
 
+<<<<<<< HEAD
 GPU_PASCAL:= -gencode=arch=compute_60,code=sm_60 -gencode=arch=compute_61,code=sm_61
 GPU_VOLTA := -gencode=arch=compute_70,code=sm_70
 GPU_TURING:= -gencode=arch=compute_75,code=sm_75
@@ -28,6 +33,14 @@ endif
 ifeq ($(shell test $(CUDA_MAJV) -ge 11; echo $$?), 0)
   DEPLOY += $(GPU_AMPERE)
 endif
+=======
+GPU_VOLTA := -gencode=arch=compute_70,code=sm_70
+GPU_TURING:= -gencode=arch=compute_75,code=sm_75
+DEPLOY    := $(GPU_VOLTA) $(GPU_TURING)
+
+CCFLAGS   := $(STD) -O3
+NVCCFLAGS := $(STD) $(DEPLOY)
+>>>>>>> add "Huffman (re)"
 
 CCFLAGS   := $(STD) -O3
 NVCCFLAGS := $(STD) $(DEPLOY) --expt-relaxed-constexpr
@@ -58,12 +71,38 @@ all: ; @$(MAKE) cusz -j
 
 ################################################################################
 
+<<<<<<< HEAD
 _DEPS_ARG  := $(SRC_DIR)/argparse.o
 _DEPS_MEM  := $(SRC_DIR)/cuda_mem.o
 _DEPS_HIST := $(SRC_DIR)/histogram.o $(SRC_DIR)/huffman_workflow.o $(SRC_DIR)/format.o $(SRC_DIR)/canonical.o $(SRC_DIR)/huffman.o -rdc=true
 _DEPS_OLDENC := $(SRC_DIR)/huffman_codec.o $(SRC_DIR)/par_huffman.o $(SRC_DIR)/par_huffman_sortbyfreq.o $(SRC_DIR)/par_merge.o
 DEPS_HUFF := $(_DEPS_MEM) $(_DEPS_HIST) $(_DEPS_OLDENC) $(_DEPS_ARG)
 
+=======
+HUFF_DIR   := $(SRC_DIR)/huffre
+
+_DEPS_ARG  := $(SRC_DIR)/argparse.o
+_DEPS_MEM  := $(SRC_DIR)/cuda_mem.o
+_DEPS_HIST := $(SRC_DIR)/histogram.o $(SRC_DIR)/huffman_workflow.o $(SRC_DIR)/format.o $(SRC_DIR)/canonical.o $(SRC_DIR)/huffman.o -rdc=true
+_DEPS_OLDENC := $(SRC_DIR)/huffman_codec.o
+DEPS_HUFF := $(_DEPS_MEM) $(_DEPS_HIST) $(_DEPS_OLDENC) $(_DEPS_ARG)
+
+huff: $(HUFF_DIR)/huff.cu $(SRC_DIR)/argparse.cc
+	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huff.cu -o huff
+# nvcc huff.cu ../argparse.o ../constants.o ../cuda_mem.o ../huffman_workflow.o ../types.o ../format.o ../histogram.o ../huffman.o ../canonical.o ../huffman_codec.o -gencode=arch=compute_75,code=sm_75
+
+huffredemo: $(HUFF_DIR)/reduce_move_merge.cuh $(HUFF_DIR)/huffre-demo.cu
+	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huffre-demo.cu -o huffre-demo
+
+huffretime: $(HUFF_DIR)/reduce_move_merge.cuh $(HUFF_DIR)/huffre-demo.cu
+	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huffre-demo.cu -o huffre-reduce1  -DREDUCE1TIME
+	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huffre-demo.cu -o huffre-reduce12 -DREDUCE12TIME
+	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huffre-demo.cu -o huffre-allmerge -DALLMERGETIME 
+
+huffredbg: $(HUFF_DIR)/reduce_move_merge.cuh $(HUFF_DIR)/huffre-demo.cu
+	$(NVCC) $(NVCCFLAGS) $(CUDA_DBG) $(DEPS_HUFF) $(HUFF_DIR)/huffre-demo.cu -o huffre-dbg -DDBG0,DBG1,DBG2
+
+>>>>>>> add "Huffman (re)"
 install: bin/cusz
 	cp bin/cusz /usr/local/bin
 

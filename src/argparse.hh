@@ -40,12 +40,29 @@ typedef struct ArgPack {
     string dtype;
     int    dict_size;
     int    quant_rep;
+    int    input_rep;        // for standalone huffman
+    int    huffman_datalen;  // for standalone huffman
     int    huffman_rep;
     int    huffman_chunk;
+<<<<<<< HEAD
     int    n_dim, d0, d1, d2, d3;
     double mantissa, exponent;
     bool   to_archive, to_extract, to_dryrun;
     bool   autotune_huffman_chunk;
+=======
+    int    n_dim;
+    int    d0;
+    int    d1;
+    int    d2;
+    int    d3;
+    double mantissa;
+    double exponent;
+    bool   to_archive;
+    bool   to_extract;
+    bool   to_encode;    // for standalone huffman
+    bool   to_decode;    // for standalone huffman
+    bool   get_entropy;  // for standalone huffman (not in use)
+>>>>>>> add "Huffman (re)"
     bool   use_demo;
     bool   verbose;
     bool   to_verify;
@@ -78,8 +95,11 @@ typedef struct ArgPack {
 
     ArgPack(int argc, char** argv, bool standalone_huffman);
 
+<<<<<<< HEAD
     void SortOutFilenames();
 
+=======
+>>>>>>> add "Huffman (re)"
 } argpack;
 
 #endif  // ARGPARSE_HH

@@ -73,7 +73,10 @@ __global__ void GPU::GetCanonicalCode(uint8_t* singleton, int DICT_SIZE)
     o_cb[gid] = ~((H)0x0);
     g.sync();
 
+<<<<<<< HEAD
     // Reverse Codebook Generation -- TODO isolate
+=======
+>>>>>>> add "Huffman (re)"
     if (gid == 0) {
         // no atomicRead to handle read-after-write (true dependency)
         for (int i = 0; i < DICT_SIZE; i++) {

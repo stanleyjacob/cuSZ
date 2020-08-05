@@ -20,6 +20,9 @@
 #include <cstdint>
 #include <string>
 #include <tuple>
+#include <string>
+
+using std::string;
 
 using std::string;
 
