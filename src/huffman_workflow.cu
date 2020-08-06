@@ -74,9 +74,7 @@ void wrapper::GetFrequency(Q* d_bcode, size_t len, unsigned int* d_freq, int dic
     // fits to size
     int threadsPerBlock = ((((numValues / (numBlocks * itemsPerThread)) + 1) / 64) + 1) * 64;
     while (threadsPerBlock > 1024) {
-        if (RPerBlock <= 1) {
-            threadsPerBlock = 1024;
-        }
+        if (RPerBlock <= 1) { threadsPerBlock = 1024; }
         else {
             RPerBlock /= 2;
             numBlocks *= 2;
@@ -97,11 +95,7 @@ void wrapper::GetFrequency(Q* d_bcode, size_t len, unsigned int* d_freq, int dic
                 auto possibility = freq[i] / (1.0 * len);
                 entropy -= possibility * log(possibility);
             }
-<<<<<<< HEAD
         logall(log_dbg, "entropy:", entropy);
-=======
-        cout << log_info << "entropy:\t\t" << entropy << endl;
->>>>>>> add "Huffman (re)"
         delete[] freq;
     }
 
@@ -168,18 +162,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Q* d_in, size_t l
     // io::WriteBinaryFile(cb_dump, dict_size, new string(f_in + ".canonized"));
     // --------------------------------
 
-<<<<<<< HEAD
     // fix-length space
-=======
-    // --------------------------------
-    // this is for internal evaluation, not in sz archive
-    auto cb_dump = mem::CreateHostSpaceAndMemcpyFromDevice(d_canonical_cb, dict_size);
-    io::WriteBinaryFile(cb_dump, dict_size, new string(f_bcode + ".canonized"));
-
-    // --------------------------------
-
-    // wrapper::EncodeByMemcpy(d_bcode, len, d_hcode, d_canonical_cb);
->>>>>>> add "Huffman (re)"
     {
         auto blockDim = tBLK_ENCODE;
         auto gridDim  = (len - 1) / blockDim + 1;
