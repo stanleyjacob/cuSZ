@@ -131,7 +131,6 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Q* d_in, size_t l
         for (auto i = 0; i < dict_size; i++)
             if (freq[i] != 0) {
                 avg_bw += get_bw(plain_cb[i]) * freq[i];
-//                cout << "idx:\t" << i << "bw:\t" << get_bw(plain_cb[i]) << "\tfreq:\t" << freq[i] << "\tratio:\t" << freq[i] * 1.0 / len << endl;
             }
         cout << log_info << "avg. bw:\t" << avg_bw / len << endl;
     }

@@ -36,12 +36,23 @@ inline int get_symlen(H sym)
 }
 
 template <typename Q, typename H>
-void synthesize_q(Q* q, uint32_t len, H* cb)  // prepare for extra outliers
+void filter_out(Q* q, uint32_t len, H* cb, uint32_t cb_len = 1024, uint32_t threshold = 5)  // prepare for extra outliers
 {
+    // find shortest "special" symbol
+    auto shortest = 0xff;
+    Q    special;
+    for (auto i = 0; i < cb_len; i++) {
+        auto sym_len = get_symlen(cb[i]);
+        if (sym_len < shortest) {
+            shortest = sym_len;
+            special  = i;
+        }
+    }
+
     for (auto i = 0; i < len; i++) {
         auto sym     = cb[q[i]];
         auto sym_len = get_symlen(sym);
-        if (sym_len > 5) q[i] = 0;
+        if (sym_len > threshold) q[i] = special;
     }
 }
 
@@ -99,7 +110,7 @@ new_enc_reduceshufflemerge_prefixsum(Q* q, uint32_t len, H* cb, uint32_t cb_len,
     cout << "gridDim \t" << gridDim << endl;
     cout << "per-block shmem bytes\t" << buff_bytes << "\t" << 96 * 1024 / buff_bytes << " blocks EXPECTED on 1 SM" << endl;
     cout << 1024 * 2 / blockDim << " should be blocks on 1 SM" << endl;
-    auto d_hmeta = mem::CreateCUDASpace<uint32_t>(gridDim);         // chunkwise metadata
+    auto d_hmeta = mem::CreateCUDASpace<uint32_t>(gridDim);                   // chunkwise metadata
     ReduceShuffle_PrefixSum<Q, H, Magnitude, ReductionFactor, ShuffleFactor>  //
         <<<gridDim, blockDim, buff_bytes>>>(d_q, len, d_cb, d_h, cb_len, d_hmeta, nullptr, dbg_bi);
     HANDLE_ERROR(cudaDeviceSynchronize());
@@ -179,17 +190,17 @@ void check_afterward(
     std::tuple<uint32_t, H*, uint32_t*> ne,
     std::tuple<uint32_t, H*, size_t*>   oe,
     unsigned int                        len,
-    double                              entropy,
+    double                              avg_bw,
     unsigned int                        ChunkSize,
     unsigned int                        override_blks_check = 0)
 {
     // depack results
-    auto ne_nchunk = std::get<0>(ne);  //
-    auto ne_h      = std::get<1>(ne);  //
-    auto ne_hmeta  = std::get<2>(ne);  //
-    auto oe_nchunk = std::get<0>(oe);  //
-    auto oe_h      = std::get<1>(oe);  //
-    auto oe_hmeta  = std::get<2>(oe);  //
+    auto ne_nchunk = std::get<0>(ne);
+    auto ne_h      = std::get<1>(ne);
+    auto ne_hmeta  = std::get<2>(ne);
+    auto oe_nchunk = std::get<0>(oe);
+    auto oe_h      = std::get<1>(oe);
+    auto oe_hmeta  = std::get<2>(oe);
 
     if (ne_nchunk != oe_nchunk) {
         cerr << "new encoder nchunk != old enc nchunk" << endl;
@@ -227,100 +238,132 @@ void check_afterward(
         }
     }
     cout << "# bad chunks: " << count_bad_chunks << " out of " << num_check_blk << endl;
-    cout << "# bad uint32: " << count_bad_uint32 << " out of " << static_cast<int>(len * entropy / 32) << endl;
+    cout << "# bad uint32: " << count_bad_uint32 << " out of " << static_cast<int>(len * avg_bw / 32) << endl;
 
     delete[] ne_h, ne_hmeta, oe_h, oe_hmeta;
 }
 
-int main(int argc, char** argv)
+template <typename Qtype, typename Htype, unsigned int Magnitude, unsigned int ReductionFactor>
+void exp_wrapper(Qtype* q, unsigned int len, Htype* cb, unsigned int cb_len, unsigned int dummy_nchunk, double avg_bw)
 {
-    typedef uint16_t Qtype;
-    typedef uint32_t Htype;
+    std::tuple<uint32_t, Htype*, uint32_t*> ne1, ne2, ne3;
+    std::tuple<uint32_t, Htype*, size_t*>   oe;
 
-    string   f_q, f_cb;
+    const auto ChunkSize     = 1 << Magnitude;
+    const auto ShuffleFactor = Magnitude - ReductionFactor;
+
+    ne1 = new_enc_reduceshufflemerge<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>            // reduce shuffle
+        (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
+    ne2 = new_enc_prefixsum_only<Qtype, Htype, Magnitude>                                                // prefix-sum only
+        (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
+    ne3 = new_enc_reduceshufflemerge_prefixsum<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>  // reduce + prefix-sum
+        (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
+    oe = old_enc<Qtype, Htype, Magnitude>                                                                // omp like
+        (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);
+
+    check_afterward(ne1, oe, len, avg_bw, ChunkSize);
+}
+
+template <typename Qtype, typename Htype>
+std::tuple<double, double> get_avgbw_entropy(Qtype* q, unsigned int len, Htype* cb, unsigned int cb_len)
+{
+    auto d_q_hist = mem::CreateDeviceSpaceAndMemcpyFromHost(q, len);
+    auto d_freq   = mem::CreateCUDASpace<unsigned int>(cb_len);
+    wrapper::GetFrequency(d_q_hist, len, d_freq, cb_len);
+    auto freq = mem::CreateHostSpaceAndMemcpyFromDevice(d_freq, cb_len);
+
+    double avg_bw = 0, entropy = 0;
+    for (auto i = 0; i < cb_len; i++) {
+        auto   bw = get_symlen(cb[i]);
+        auto   f  = freq[i] * 1.0;
+        double p  = f * 1.0 / len;
+        if (bw != 255) avg_bw += f * bw;
+        if (bw != 255) entropy += p * log(p);
+    }
+    avg_bw /= len;
+    entropy = -entropy;
+
+    cout << log_info << "average bw:\t" << avg_bw << endl;
+    cout << log_info << "entropy:\t" << entropy << endl;
+
+    cudaFree(d_q_hist), cudaFree(d_freq);
+
+    return {avg_bw, entropy};
+}
+
+template <typename Qtype, typename Htype>
+void submain(int argc, char** argv)
+{
+    cout << "using uint" << sizeof(Qtype) * 8 << " as input data type" << endl;
+    string   f_indata, f_cb, dtype;
     uint32_t dummy_nchunk = 0;
-    if (argc < 3) {
-        f_q = string("baryon_density.dat.b16"), f_cb = string("baryon_density.dat.b16.canonized");
-        cout << "./huff <quant code> <codebook> <dummy #chunk>\nusing default: " << f_q << "\t" << f_cb << endl;
-        dummy_nchunk = 0;
+    uint32_t cb_len, len;
+
+    if (argc < 4) {
+        f_indata = string("baryon_density.dat.b16");
+        dtype    = string("uint16");
+        len      = 512 * 512 * 512;
+        f_cb     = string("baryon_density.dat.b16.canonized");
+        cb_len   = 1024;
+        cout << "./huff <input data> <dtype> <len> <codebook> <cb size>\nusing default: " << f_indata << "\t" << f_cb << endl;
     }
     else {
-        f_q = string(argv[1]), f_cb = string(argv[2]);
-        dummy_nchunk = atoi(argv[3]);
+        f_indata = string(argv[1]);
+        dtype    = string(argv[2]);
+        len      = atoi(argv[3]);
+        f_cb     = string(argv[4]);
+        cb_len   = atoi(argv[5]);
     }
+
+    cout << "cb size\t" << cb_len << endl;
     cudaDeviceReset();
 
-    auto cb_len = 1024, len = 512 * 512 * 512;
-    auto q  = io::ReadBinaryFile<Qtype>(f_q, len);
+    auto q  = io::ReadBinaryFile<Qtype>(f_indata, len);
     auto cb = io::ReadBinaryFile<Htype>(f_cb, cb_len);
 
     auto symbol_zero = cb[0];
     cout << "symbol zero len: " << get_symlen(symbol_zero) << "\t" << bitset<32>(symbol_zero) << endl;
 
-    synthesize_q(q, len, cb);  // prepare for extra outliers
+    filter_out(q, len, cb);  // prepare for extra outliers
 
-    //    for (auto i = 0; i < 200; i++) cout << i << "\t" << bitset<16>(q[i]) << endl;      // check q   [PASS]
-    //    for (auto i = 0; i < cb_len; i++) cout << i << "\t" << bitset<32>(cb[i]) << endl;  // check cb  [PASS]
-
-    // TODO histogram -> entropy
-    double entropy;
-    {
-        auto d_q_hist = mem::CreateDeviceSpaceAndMemcpyFromHost(q, len);
-        auto d_freq   = mem::CreateCUDASpace<unsigned int>(cb_len);
-        wrapper::GetFrequency(d_q_hist, len, d_freq, cb_len);
-        auto freq = mem::CreateHostSpaceAndMemcpyFromDevice(d_freq, cb_len);
-        entropy   = 0;
-        for (auto i = 0; i < cb_len; i++) {
-            auto bw = get_symlen(cb[i]);
-            if (bw != 255) entropy += static_cast<double>(freq[i]) * static_cast<double>(bw);
-        }
-        entropy /= len;
-        cout << "entropy: " << entropy << endl;
-        cudaFree(d_q_hist), cudaFree(d_freq);
-    }
+    double avg_bw, entropy;
+    std::tie(avg_bw, entropy) = get_avgbw_entropy<Qtype, Htype>(q, len, cb, cb_len);
 
     dbg_bi               = 0;   // debug only
     const auto Magnitude = 10;  // 1 << 10, 1024 point per chunk
     const auto ChunkSize = 1 << Magnitude;
 
-    std::tuple<uint32_t, Htype*, uint32_t*> ne1;
-    std::tuple<uint32_t, Htype*, uint32_t*> ne2;
-    std::tuple<uint32_t, Htype*, uint32_t*> ne3;
-    std::tuple<uint32_t, Htype*, size_t*>   oe;
+    len = len / ChunkSize * ChunkSize;  // for now
 
-    if (entropy >= 2 and entropy < 4) {
-        const auto ReductionFactor = 3;  // (2.0 to <4.0) * 8 = (16.0 to <32.0); 1 << (10-3) == 128
-        const auto ShuffleFactor   = Magnitude - ReductionFactor;
-
-        ne1 = new_enc_reduceshufflemerge<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>            // new encoder
-            (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
-        ne2 = new_enc_prefixsum_only<Qtype, Htype, Magnitude>                                                // new encoder
-            (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
-        ne3 = new_enc_reduceshufflemerge_prefixsum<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>  // new encoder
-            (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
-        oe = old_enc<Qtype, Htype, Magnitude>                                                                // old encoder
-            (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
+    ////////////////////////////////////////////////////////////////////////////////
+    if (avg_bw >= 2 and avg_bw < 4) {
+        const auto ReductionFactor = 3;
+        exp_wrapper<Qtype, Htype, Magnitude, ReductionFactor>(q, len, cb, cb_len, dummy_nchunk, avg_bw);
     }
-    /*
-    else if (entropy >= 4 and entropy < 8) {
-        cout << "not yet" << endl;
-        const auto ReductionFactor = 2;  // (2.0 to <4.0) * 8 = (16.0 to <32.0); 1 << (10-3) == 128
-        const auto ShuffleFactor   = Magnitude - ReductionFactor;
-
-        ne = new_enc<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>  // new encoder
-            (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);             //
-        oe = old_enc<Qtype, Htype, Magnitude>                                  // old encoder
-            (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);             //
+    else if (avg_bw >= 4 and avg_bw < 8) {
+        const auto ReductionFactor = 2;
+        exp_wrapper<Qtype, Htype, Magnitude, ReductionFactor>(q, len, cb, cb_len, dummy_nchunk, avg_bw);
     }
-     */
+    else if (avg_bw >= 8) {
+        const auto ReductionFactor = 1;
+        exp_wrapper<Qtype, Htype, Magnitude, ReductionFactor>(q, len, cb, cb_len, dummy_nchunk, avg_bw);
+    }
 
-#ifndef REDUCE1TIME
-#ifndef REDUCE12TIME
-#ifndef ALLMERGETIME
-    check_afterward(ne1, oe, len, entropy, ChunkSize);
-#endif
-#endif
-#endif
     delete[] q, cb;
+}
+
+int main(int argc, char** argv)
+{
+    string dtype;
+    if (argc < 4)
+        dtype = string("uint16");
+    else
+        dtype = string(argv[2]);
+
+    if (dtype == "uint8")
+        submain<uint8_t, uint32_t>(argc, argv);
+    else if (dtype == "uint16")
+        submain<uint16_t, uint32_t>(argc, argv);
+
     return 0;
 }
