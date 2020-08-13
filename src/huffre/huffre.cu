@@ -36,23 +36,29 @@ inline int get_symlen(H sym)
 }
 
 template <typename Q, typename H>
-void filter_out(Q* q, uint32_t len, H* cb, uint32_t cb_len = 1024, uint32_t threshold = 5)  // prepare for extra outliers
+void filter_out(Q* q, uint32_t len, H* cb, uint32_t cb_len, uint32_t threshold_bw = 5)  // prepare for extra outliers
 {
     // find shortest "special" symbol
-    auto shortest = 0xff;
-    Q    special;
+    unsigned int shortest = 255;
+    Q            special;
+    H            special_code;
     for (auto i = 0; i < cb_len; i++) {
+        //        cout << i << "\t" << get_symlen(cb[i]) << "\t" << bitset<32>(cb[i]) << endl;
+
         auto sym_len = get_symlen(cb[i]);
         if (sym_len < shortest) {
-            shortest = sym_len;
-            special  = i;
+            shortest     = sym_len;
+            special      = i;
+            special_code = cb[i];
         }
     }
+    cout << log_dbg << "shortest codeword len\t" << shortest << "\tcodeword\t" << bitset<32>(special_code) << endl;
+    cout << log_dbg << "filtering threshold bw\t" << threshold_bw << endl;
 
     for (auto i = 0; i < len; i++) {
         auto sym     = cb[q[i]];
         auto sym_len = get_symlen(sym);
-        if (sym_len > threshold) q[i] = special;
+        if (sym_len > threshold_bw) q[i] = special;
     }
 }
 
@@ -192,7 +198,7 @@ void check_afterward(
     unsigned int                        len,
     double                              avg_bw,
     unsigned int                        ChunkSize,
-    unsigned int                        override_blks_check = 0)
+    int                                 override_blks_check = 0)
 {
     // depack results
     auto ne_nchunk = std::get<0>(ne);
@@ -252,6 +258,8 @@ void exp_wrapper(Qtype* q, unsigned int len, Htype* cb, unsigned int cb_len, uns
     const auto ChunkSize     = 1 << Magnitude;
     const auto ShuffleFactor = Magnitude - ReductionFactor;
 
+    cout << log_info << "Magnitude=" << Magnitude << "\tReductionFactor=" << ReductionFactor << "\tShuffleFactor=" << ShuffleFactor << endl;
+
     ne1 = new_enc_reduceshufflemerge<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>            // reduce shuffle
         (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
     ne2 = new_enc_prefixsum_only<Qtype, Htype, Magnitude>                                                // prefix-sum only
@@ -261,7 +269,7 @@ void exp_wrapper(Qtype* q, unsigned int len, Htype* cb, unsigned int cb_len, uns
     oe = old_enc<Qtype, Htype, Magnitude>                                                                // omp like
         (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);
 
-    check_afterward(ne1, oe, len, avg_bw, ChunkSize);
+    check_afterward(ne1, oe, len, avg_bw, ChunkSize, /* override the checked blk # */ 0);
 }
 
 template <typename Qtype, typename Htype>
@@ -294,37 +302,52 @@ std::tuple<double, double> get_avgbw_entropy(Qtype* q, unsigned int len, Htype* 
 template <typename Qtype, typename Htype>
 void submain(int argc, char** argv)
 {
-    cout << "using uint" << sizeof(Qtype) * 8 << " as input data type" << endl;
     string   f_indata, f_cb, dtype;
     uint32_t dummy_nchunk = 0;
     uint32_t cb_len, len;
+    uint32_t threashold_bw = 5;
 
-    if (argc < 4) {
-        f_indata = string("baryon_density.dat.b16");
-        dtype    = string("uint16");
-        len      = 512 * 512 * 512;
-        f_cb     = string("baryon_density.dat.b16.canonized");
-        cb_len   = 1024;
-        cout << "./huff <input data> <dtype> <len> <codebook> <cb size>\nusing default: " << f_indata << "\t" << f_cb << endl;
+    if (argc == 2) {
+        string tmp(argv[1]);
+        if (tmp == "--demo") {
+            f_indata = string("baryon_density.dat.b16");
+            dtype    = string("uint16");
+            len      = 512 * 512 * 512;
+            f_cb     = string("baryon_density.dat.b16.canonized");
+            cb_len   = 1024;
+            cout << "./huffre <input data> <dtype> <len> <codebook> <cb size> <threshold bw>\nusing default: " << f_indata << "\t" << f_cb << endl;
+            cout << log_info << "running demo instead" << endl;
+            goto execute_demo;
+        }
+    }
+    else if (argc < 6) {
+        cout << "./huffre <input data> <dtype> <len> <codebook> <cb size> <threshold bw>" << endl;
+        exit(1);
     }
     else {
-        f_indata = string(argv[1]);
-        dtype    = string(argv[2]);
-        len      = atoi(argv[3]);
-        f_cb     = string(argv[4]);
-        cb_len   = atoi(argv[5]);
+        f_indata      = string(argv[1]);
+        dtype         = string(argv[2]);
+        len           = atoi(argv[3]);
+        f_cb          = string(argv[4]);
+        cb_len        = atoi(argv[5]);
+        threashold_bw = atoi(argv[6]);
     }
 
-    cout << "cb size\t" << cb_len << endl;
+execute_demo:
+
+    cout << log_info << "using uint" << sizeof(Qtype) * 8 << " as input data type" << endl;
+
+    cout << log_info << "codebook size\t" << cb_len << endl;
     cudaDeviceReset();
 
     auto q  = io::ReadBinaryFile<Qtype>(f_indata, len);
     auto cb = io::ReadBinaryFile<Htype>(f_cb, cb_len);
 
-    auto symbol_zero = cb[0];
-    cout << "symbol zero len: " << get_symlen(symbol_zero) << "\t" << bitset<32>(symbol_zero) << endl;
+    // for (auto i = 0; i < cb_len; i++ ) {
+    //    cout << i << "\t" << get_symlen(cb[i]) << "\t" << bitset<32>(cb[i]) << endl;
+    //}
 
-    filter_out(q, len, cb);  // prepare for extra outliers
+    filter_out(q, len, cb, cb_len, threashold_bw);  // prepare for extra outliers
 
     double avg_bw, entropy;
     std::tie(avg_bw, entropy) = get_avgbw_entropy<Qtype, Htype>(q, len, cb, cb_len);
