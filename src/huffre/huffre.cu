@@ -40,6 +40,7 @@ void filter_out(Q* q, uint32_t len, H* cb, uint32_t cb_len, uint32_t threshold_b
 {
     // find shortest "special" symbol
     unsigned int shortest = 255;
+    unsigned int count    = 0;
     Q            special;
     H            special_code;
     for (auto i = 0; i < cb_len; i++) {
@@ -58,8 +59,12 @@ void filter_out(Q* q, uint32_t len, H* cb, uint32_t cb_len, uint32_t threshold_b
     for (auto i = 0; i < len; i++) {
         auto sym     = cb[q[i]];
         auto sym_len = get_symlen(sym);
-        if (sym_len > threshold_bw) q[i] = special;
+        if (sym_len > threshold_bw) {
+            q[i] = special;
+            count++;
+        }
     }
+    cout << log_info << count << " are changed, " << (count * 100.0 / len) << "%" << endl;
 }
 
 template <typename Q, typename H, int Magnitude>
@@ -223,8 +228,9 @@ void check_afterward(
     auto num_check_blk = ne_nchunk;
     num_check_blk      = override_blks_check == 0 ? ne_nchunk : override_blks_check;
 
-    // for (auto i = 1070; i < 1080; i++) {
-    for (auto i = 0, count = 0; i < ne_nchunk; i++) {
+    auto count = 0;
+
+    for (auto i = 0; i < ne_nchunk; i++) {
         for (auto j = 0; j < (ne_hmeta[i] - 1) / (sizeof(H) * 8) + 1; j++) {
             auto idx = ChunkSize * i + j;
             if (ne_h[idx] != oe_h[idx]) {
@@ -239,9 +245,12 @@ void check_afterward(
             }
         }
         if (count != 0) {
-            cout << count << " dtypes are affected." << endl;
             count_bad_uint32 += count, count_bad_chunks++;
         }
+    }
+
+    if (count != 0) {
+        cout << count << " dtypes are affected." << endl;
     }
     cout << "# bad chunks: " << count_bad_chunks << " out of " << num_check_blk << endl;
     cout << "# bad uint32: " << count_bad_uint32 << " out of " << static_cast<int>(len * avg_bw / 32) << endl;
@@ -346,11 +355,22 @@ execute_demo:
     // for (auto i = 0; i < cb_len; i++ ) {
     //    cout << i << "\t" << get_symlen(cb[i]) << "\t" << bitset<32>(cb[i]) << endl;
     //}
-
-    filter_out(q, len, cb, cb_len, threashold_bw);  // prepare for extra outliers
-
     double avg_bw, entropy;
-    std::tie(avg_bw, entropy) = get_avgbw_entropy<Qtype, Htype>(q, len, cb, cb_len);
+    double avg_bw_post, entropy_post;
+    double avg_bw_decision;
+
+    {
+        cout << log_info << "before filtering out: " << endl;
+        std::tie(avg_bw, entropy) = get_avgbw_entropy<Qtype, Htype>(q, len, cb, cb_len);
+
+        filter_out(q, len, cb, cb_len, threashold_bw);  // prepare for extra outliers
+
+        cout << endl;
+        cout << log_info << "after filtering out: " << endl;
+        std::tie(avg_bw_post, entropy_post) = get_avgbw_entropy<Qtype, Htype>(q, len, cb, cb_len);
+
+        avg_bw_decision = max(avg_bw, avg_bw_post);
+    }
 
     dbg_bi               = 0;   // debug only
     const auto Magnitude = 10;  // 1 << 10, 1024 point per chunk
@@ -359,17 +379,17 @@ execute_demo:
     len = len / ChunkSize * ChunkSize;  // for now
 
     ////////////////////////////////////////////////////////////////////////////////
-    if (avg_bw >= 2 and avg_bw < 4) {
+    if (avg_bw_decision >= 2 and avg_bw_decision < 4) {
         const auto ReductionFactor = 3;
-        exp_wrapper<Qtype, Htype, Magnitude, ReductionFactor>(q, len, cb, cb_len, dummy_nchunk, avg_bw);
+        exp_wrapper<Qtype, Htype, Magnitude, ReductionFactor>(q, len, cb, cb_len, dummy_nchunk, avg_bw_decision);
     }
-    else if (avg_bw >= 4 and avg_bw < 8) {
+    else if (avg_bw_decision >= 4 and avg_bw_decision < 8) {
         const auto ReductionFactor = 2;
-        exp_wrapper<Qtype, Htype, Magnitude, ReductionFactor>(q, len, cb, cb_len, dummy_nchunk, avg_bw);
+        exp_wrapper<Qtype, Htype, Magnitude, ReductionFactor>(q, len, cb, cb_len, dummy_nchunk, avg_bw_decision);
     }
-    else if (avg_bw >= 8) {
+    else if (avg_bw_decision >= 8) {
         const auto ReductionFactor = 1;
-        exp_wrapper<Qtype, Htype, Magnitude, ReductionFactor>(q, len, cb, cb_len, dummy_nchunk, avg_bw);
+        exp_wrapper<Qtype, Htype, Magnitude, ReductionFactor>(q, len, cb, cb_len, dummy_nchunk, avg_bw_decision);
     }
 
     delete[] q, cb;
