@@ -45,7 +45,7 @@ if [[ ! -f "mr.bz2" ]]; then
 else
 	echo "mr.bz2 exists"
 fi
-if [[ ! -f "mr.bz2" ]]; then
+if [[ ! -f "mr" ]]; then
 	echo "decompressing mr"
 	bzip2 -d -k mr.bz2
 else
