@@ -105,7 +105,7 @@ ArgPack::HuffmanCheckArgs()
     }
 
     if (to_abort) {
-        cuszDoc();
+        HuffmanDoc();
         exit(-1);
     }
 }
