@@ -310,10 +310,10 @@ void submain(int argc, char** argv)
     if (argc == 2) {
         string tmp(argv[1]);
         if (tmp == "--demo") {
-            f_indata = string("baryon_density.dat.b16");
+            f_indata = string("data/baryon_density.dat.b16");
             dtype    = string("uint16");
             len      = 512 * 512 * 512;
-            f_cb     = string("baryon_density.dat.b16.canonized");
+            f_cb     = string("data/baryon_density.dat.b16.canonized");
             cb_len   = 1024;
             cout << "./huffre <input data> <dtype> <len> <codebook> <cb size> <threshold bw>\nusing default: " << f_indata << "\t" << f_cb << endl;
             cout << log_info << "running demo instead" << endl;
