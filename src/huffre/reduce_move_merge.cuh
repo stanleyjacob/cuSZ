@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include "auxiliary.cuh"
 
-__device__ int outlier_num;
-
 // https://stackoverflow.com/questions/42309369/can-my-kernel-code-tell-how-much-shared-memory-it-has-available
 // usage: if (ti == 0) printf("shared memory size: %u\n", dynamic_smem_size());
 __forceinline__ __device__ unsigned dynamic_smem_size()
@@ -474,7 +472,7 @@ __global__ void ReduceShuffle_PrefixSum(Q* q, size_t len, H* cb, H* h, size_t cb
  * thus we don't have to overkill by marking too many data and covert them to shorter avatars
  */
 template <typename Q, typename H, int Magnitude, int ReductionFactor, int ShuffleFactor>
-__global__ void TrackViolating(Q* q, size_t len, H* cb, H* h, size_t cb_len, uint32_t* hmeta, char* rich_dbg = nullptr, uint32_t dbg_bi = 3)
+__global__ void TrackViolating(Q* q, size_t len, H* cb, int* outlier_num = nullptr)
 {
     static_assert(Magnitude == ReductionFactor + ShuffleFactor, "Data magnitude not equal to (shuffle + reduction) factor");
     static_assert(ReductionFactor >= 1, "Reduction factor must be larger than 1");
@@ -485,11 +483,6 @@ __global__ void TrackViolating(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
     auto n_worker  = blockDim.x;
     auto chunksize = 1 << Magnitude;
     // auto __data    = reinterpret_cast<H*>(__buff);
-    auto _counter = reinterpret_cast<int*>(__buff);
-    auto counter  = _counter[0];
-
-    if (ti == 0) counter = 0;
-    __syncthreads();
 
     auto __bw = reinterpret_cast<int*>(__buff + (chunksize / 2 + chunksize / 4) * sizeof(H));
     // auto data_src  = __data;                  // 1st data zone of (chunksize/2)
@@ -536,29 +529,20 @@ __global__ void TrackViolating(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
             __syncthreads();
         }
         __syncthreads();
-        // data_exc = data_src,
+
         bw_exc = bw_src;
-        // data_src = data_dst,
         bw_src = bw_dst;
-        // data_dst = data_exc,
         bw_dst = bw_exc;
         __syncthreads();
     }
     __syncthreads();
 
-    if (bw_src[ti] > 32) atomicAdd(&counter, 1 << ReductionFactor);
-    __syncthreads();
-    if (ti == 0) atomicAdd(&outlier_num, counter);
+    if (bw_src[ti] > 32) atomicAdd(outlier_num, 1 << ReductionFactor);
 }
 
-__global__ void PrepareReadViolating()
+__global__ void ReadViolating(int* outlier_num, size_t len)
 {
-    outlier_num = 0;
-}
-
-__global__ void ReadViolating(size_t len)
-{
-    printf("the violating number is %d, %lf %", outlier_num, outlier_num * 1.0 / len);
+    printf("the violating number is %d, %lf %\n", outlier_num[0], outlier_num[0] * 1.0 / len);
 }
 
 /*

@@ -156,14 +156,13 @@ new_enc_dryrun_findviolating(Q* q, uint32_t len, H* cb, uint32_t cb_len, /*H* h,
     cout << 1024 * 2 / blockDim << " should be blocks on 1 SM" << endl;
     auto d_hmeta = mem::CreateCUDASpace<uint32_t>(gridDim);  // chunkwise metadata
 
-    PrepareReadViolating<<<1, 1>>>();
-    HANDLE_ERROR(cudaDeviceSynchronize());
+    auto d_outlier_num = mem::CreateCUDASpace<int>(1);
 
     TrackViolating<Q, H, Magnitude, ReductionFactor, ShuffleFactor>  //
-        <<<gridDim, blockDim, buff_bytes>>>(d_q, len, d_cb, d_h, cb_len, d_hmeta, nullptr, dbg_bi);
+        <<<gridDim, blockDim, buff_bytes>>>(d_q, len, d_cb, d_outlier_num);
     HANDLE_ERROR(cudaDeviceSynchronize());
 
-    ReadViolating<<<1, 1>>>(len);
+    ReadViolating<<<1, 1>>>(d_outlier_num, len);
     HANDLE_ERROR(cudaDeviceSynchronize());
 
     auto h     = mem::CreateHostSpaceAndMemcpyFromDevice(d_h, len);
@@ -300,9 +299,20 @@ void check_afterward(
 }
 
 template <typename Qtype, typename Htype, unsigned int Magnitude, unsigned int ReductionFactor>
+void dryrun_wrapper(Qtype* q, unsigned int len, Htype* cb, unsigned int cb_len, unsigned int dummy_nchunk, double avg_bw)
+{
+    std::tuple<uint32_t, Htype*, uint32_t*> ne_dryrun;
+
+    const auto ShuffleFactor = Magnitude - ReductionFactor;
+    cout << log_info << "Magnitude=" << Magnitude << "\tReductionFactor=" << ReductionFactor << "\tShuffleFactor=" << ShuffleFactor << endl;
+    ne_dryrun = new_enc_dryrun_findviolating<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>  // reduce + prefix-sum
+        (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                         //
+}
+
+template <typename Qtype, typename Htype, unsigned int Magnitude, unsigned int ReductionFactor>
 void exp_wrapper(Qtype* q, unsigned int len, Htype* cb, unsigned int cb_len, unsigned int dummy_nchunk, double avg_bw)
 {
-    std::tuple<uint32_t, Htype*, uint32_t*> ne1, ne2, ne3, ne_dryrun;
+    std::tuple<uint32_t, Htype*, uint32_t*> ne1, ne2, ne3;
     std::tuple<uint32_t, Htype*, size_t*>   oe;
 
     const auto ChunkSize     = 1 << Magnitude;
@@ -317,13 +327,10 @@ void exp_wrapper(Qtype* q, unsigned int len, Htype* cb, unsigned int cb_len, uns
     ne3 = new_enc_reduceshufflemerge_prefixsum<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>  // reduce + prefix-sum
         (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
 
-    ne_dryrun = new_enc_dryrun_findviolating<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>  // reduce + prefix-sum
-        (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                         //
-
     oe = old_enc<Qtype, Htype, Magnitude>  // omp like
         (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);
 
-    check_afterward(ne1, oe, len, avg_bw, ChunkSize, /* override the checked blk # */ 0);
+    check_afterward(ne1, oe, len, avg_bw, ChunkSize, /* some predicate*/ 0);
 }
 
 template <typename Qtype, typename Htype>
@@ -356,13 +363,14 @@ std::tuple<double, double> get_avgbw_entropy(Qtype* q, unsigned int len, Htype* 
 template <typename Qtype, typename Htype>
 void submain(int argc, char** argv)
 {
-    string   f_indata, f_cb, dtype;
+    string   f_indata, f_cb, dtype, dryrun;
     uint32_t dummy_nchunk = 0;
     uint32_t cb_len, len;
     uint32_t threashold_bw = 5;
 
     if (argc == 2) {
         string tmp(argv[1]);
+
         if (tmp == "--demo") {
             f_indata = string("data/baryon_density.dat.b16");
             dtype    = string("uint16");
@@ -374,17 +382,26 @@ void submain(int argc, char** argv)
             goto execute_demo;
         }
     }
-    else if (argc < 6) {
+    else if (argc < 7) {
         cout << "./huffre <input data> <dtype> <len> <codebook> <cb size> <threshold bw>" << endl;
         exit(1);
     }
-    else {
+    else if (argc == 7) {
         f_indata      = string(argv[1]);
         dtype         = string(argv[2]);
         len           = atoi(argv[3]);
         f_cb          = string(argv[4]);
         cb_len        = atoi(argv[5]);
-        threashold_bw = atoi(argv[6]);
+        threashold_bw = atoi(argv[6]);  // being obsolete
+    }
+    else if (argc == 8) {
+        f_indata      = string(argv[1]);
+        dtype         = string(argv[2]);
+        len           = atoi(argv[3]);
+        f_cb          = string(argv[4]);
+        cb_len        = atoi(argv[5]);
+        threashold_bw = atoi(argv[6]);  // being obsolete
+        dryrun        = string(argv[7]);
     }
 
 execute_demo:
@@ -408,7 +425,7 @@ execute_demo:
         cout << log_info << "before filtering out: " << endl;
         std::tie(avg_bw, entropy) = get_avgbw_entropy<Qtype, Htype>(q, len, cb, cb_len);
 
-        filter_out(q, len, cb, cb_len, threashold_bw);  // prepare for extra outliers
+        // filter_out(q, len, cb, cb_len, threashold_bw);  // prepare for extra outliers
 
         cout << endl;
         cout << log_info << "after filtering out: " << endl;
