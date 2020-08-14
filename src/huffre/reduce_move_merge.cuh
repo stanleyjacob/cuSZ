@@ -488,6 +488,9 @@ __global__ void TrackViolating(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
     auto _counter = reinterpret_cast<int*>(__buff);
     auto counter  = _counter[0];
 
+    if (ti == 0) counter = 0;
+    __syncthreads();
+
     auto __bw = reinterpret_cast<int*>(__buff + (chunksize / 2 + chunksize / 4) * sizeof(H));
     // auto data_src  = __data;                  // 1st data zone of (chunksize/2)
     // auto data_dst  = __data + chunksize / 2;  // 2nd data zone of (chunksize/4)
