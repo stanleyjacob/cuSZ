@@ -115,18 +115,14 @@ __global__ void PrefixSumBased(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
         auto extra_bit = loc % (sizeof(H) * 8);
 
         atomicOr(__h + word_1, sym >> extra_bit);
-        if (word_2 == word_1) {
-            atomicOr(__h + word_2, sym << (sizeof(H) * 8 - extra_bit));
-        }
+        if (word_2 == word_1) { atomicOr(__h + word_2, sym << (sizeof(H) * 8 - extra_bit)); }
         //        auto l        = __bw[ti] sym
     }
     __syncthreads();
 
     if (ti == n_worker - 1) __bw[n_worker - 1] += bw;
 
-    if (ti < (__bw[n_worker - 1] - 1) / (sizeof(H) + 8) + 1) {
-        h[bi * n_worker + ti] = __h[ti];
-    }
+    if (ti < (__bw[n_worker - 1] - 1) / (sizeof(H) + 8) + 1) { h[bi * n_worker + ti] = __h[ti]; }
     __syncthreads();
 
     // start atomic write
@@ -145,11 +141,12 @@ __global__ void PrefixSumBased(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
  * TODO -> chunksize == 2 * blockDim.x
  */
 // template <typename Q, typename H, int Magnitude, int ReductionFactor, int ShuffleFactor>
-//__global__ void ReduceShuffle_Butterfly(Q* q, size_t len, H* cb, H* h, size_t cb_len, uint32_t* hmeta, char* rich_dbg = nullptr, uint32_t dbg_bi = 3)
+//__global__ void ReduceShuffle_Butterfly(Q* q, size_t len, H* cb, H* h, size_t cb_len, uint32_t* hmeta, char* rich_dbg
+//= nullptr, uint32_t dbg_bi = 3)
 //{
-//    static_assert(Magnitude == ReductionFactor + ShuffleFactor, "Data magnitude not equal to (shuffle + reduction) factor");
-//    static_assert(ReductionFactor >= 1, "Reduction factor must be larger than 1");
-//    static_assert((2 << Magnitude) < 98304, "Shared memory used too much.");
+//    static_assert(Magnitude == ReductionFactor + ShuffleFactor, "Data magnitude not equal to (shuffle + reduction)
+//    factor"); static_assert(ReductionFactor >= 1, "Reduction factor must be larger than 1"); static_assert((2 <<
+//    Magnitude) < 98304, "Shared memory used too much.");
 //
 //    extern __shared__ char __buff[];
 //
@@ -187,7 +184,8 @@ __global__ void PrefixSumBased(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
 //
 //        data_src[lidx] = lsym | (rsym >> lbw);  //
 //        bw_src[lidx]   = lbw + rbw;             // sum bitwidths
-//        //        if (bi == dbg_bi) printf("reduce=1; idx=(%u,%u);\tbw=(%u,%u);\n", lidx, lidx + first_stride, lbw, rbw);
+//        //        if (bi == dbg_bi) printf("reduce=1; idx=(%u,%u);\tbw=(%u,%u);\n", lidx, lidx + first_stride, lbw,
+//        rbw);
 //    }
 //    __syncthreads();
 //
@@ -211,7 +209,8 @@ __global__ void PrefixSumBased(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
 //            data_src[lidx] = lsym | (rsym >> lbw);
 //            bw_src[lidx]   = lbw + rbw;  // sum bitwidths
 //            __syncthreads();
-//            //            if (bi == dbg_bi) printf("rf=%u; idx=(%u,%u)\tbw=(%u,%u)\n", rf, lidx, lidx + stride, lbw, rbw);
+//            //            if (bi == dbg_bi) printf("rf=%u; idx=(%u,%u)\tbw=(%u,%u)\n", rf, lidx, lidx + stride, lbw,
+//            rbw);
 //        }
 //        stride /= 2;
 //        __syncthreads();
@@ -229,7 +228,8 @@ __global__ void PrefixSumBased(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
 //    auto curr_league_size   = 1 << ShuffleFactor;
 //    auto next_league_size   = curr_league_size / 2;
 //
-//    for (auto sf = ShuffleFactor; sf > 0; sf--, curr_team_halfsize *= 2, curr_league_size /= 2, next_league_size /= 2) {
+//    for (auto sf = ShuffleFactor; sf > 0; sf--, curr_team_halfsize *= 2, curr_league_size /= 2, next_league_size /= 2)
+//    {
 //        auto rank        = ti;
 //        auto iter        = ShuffleFactor + 1 - sf;
 //        auto next_rank   = NextButterflyIdx<ShuffleFactor>(rank, iter);
@@ -288,9 +288,18 @@ __global__ void PrefixSumBased(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
 //}
 
 template <typename Q, typename H, int Magnitude, int ReductionFactor, int ShuffleFactor>
-__global__ void ReduceShuffle_PrefixSum(Q* q, size_t len, H* cb, H* h, size_t cb_len, uint32_t* hmeta, char* rich_dbg = nullptr, uint32_t dbg_bi = 3)
+__global__ void ReduceShuffle_PrefixSum(
+    Q*        q,
+    size_t    len,
+    H*        cb,
+    H*        h,
+    size_t    cb_len,
+    uint32_t* hmeta,
+    char*     rich_dbg = nullptr,
+    uint32_t  dbg_bi   = 3)
 {
-    static_assert(Magnitude == ReductionFactor + ShuffleFactor, "Data magnitude not equal to (shuffle + reduction) factor");
+    static_assert(
+        Magnitude == ReductionFactor + ShuffleFactor, "Data magnitude not equal to (shuffle + reduction) factor");
     static_assert(ReductionFactor >= 1, "Reduction factor must be larger than 1");
     static_assert((2 << Magnitude) < 98304, "Shared memory used too much.");
 
@@ -441,18 +450,14 @@ __global__ void ReduceShuffle_PrefixSum(Q* q, size_t len, H* cb, H* h, size_t cb
     auto extra_bit = loc % (sizeof(H) * 8);
 
     atomicOr(__h + word_1, sym >> extra_bit);
-    if (word_2 == word_1) {
-        atomicOr(__h + word_2, sym << (sizeof(H) * 8 - extra_bit));
-    }
+    if (word_2 == word_1) { atomicOr(__h + word_2, sym << (sizeof(H) * 8 - extra_bit)); }
     //        auto l        = __bw_alt[ti] sym
     //    }
     __syncthreads();
 
     if (ti == n_worker - 1) __bw_alt[n_worker - 1] += bw;
 
-    if (ti < (__bw_alt[n_worker - 1] - 1) / (sizeof(H) + 8) + 1) {
-        h[bi * n_worker + ti] = __h[ti];
-    }
+    if (ti < (__bw_alt[n_worker - 1] - 1) / (sizeof(H) + 8) + 1) { h[bi * n_worker + ti] = __h[ti]; }
     __syncthreads();
 
     //// end of reduce-shuffle
@@ -474,7 +479,8 @@ __global__ void ReduceShuffle_PrefixSum(Q* q, size_t len, H* cb, H* h, size_t cb
 template <typename Q, typename H, int Magnitude, int ReductionFactor, int ShuffleFactor>
 __global__ void TrackViolating(Q* q, size_t len, H* cb, int* outlier_num = nullptr)
 {
-    static_assert(Magnitude == ReductionFactor + ShuffleFactor, "Data magnitude not equal to (shuffle + reduction) factor");
+    static_assert(
+        Magnitude == ReductionFactor + ShuffleFactor, "Data magnitude not equal to (shuffle + reduction) factor");
     static_assert(ReductionFactor >= 1, "Reduction factor must be larger than 1");
     static_assert((2 << Magnitude) < 98304, "Shared memory used too much.");
 
@@ -483,7 +489,6 @@ __global__ void TrackViolating(Q* q, size_t len, H* cb, int* outlier_num = nullp
     auto n_worker  = blockDim.x;
     auto chunksize = 1 << Magnitude;
     // auto __data    = reinterpret_cast<H*>(__buff);
-
     auto __bw = reinterpret_cast<int*>(__buff + (chunksize / 2 + chunksize / 4) * sizeof(H));
     // auto data_src  = __data;                  // 1st data zone of (chunksize/2)
     // auto data_dst  = __data + chunksize / 2;  // 2nd data zone of (chunksize/4)
@@ -553,9 +558,18 @@ __global__ void ReadViolating(int* outlier_num, size_t len)
  * TODO -> chunksize == 2 * blockDim.x
  */
 template <typename Q, typename H, int Magnitude, int ReductionFactor, int ShuffleFactor>
-__global__ void ReduceShuffle(Q* q, size_t len, H* cb, H* h, size_t cb_len, uint32_t* hmeta, char* rich_dbg = nullptr, uint32_t dbg_bi = 3)
+__global__ void ReduceShuffle(
+    Q*        q,
+    size_t    len,
+    H*        cb,
+    H*        h,
+    size_t    cb_len,
+    uint32_t* hmeta,
+    char*     rich_dbg = nullptr,
+    uint32_t  dbg_bi   = 3)
 {
-    static_assert(Magnitude == ReductionFactor + ShuffleFactor, "Data magnitude not equal to (shuffle + reduction) factor");
+    static_assert(
+        Magnitude == ReductionFactor + ShuffleFactor, "Data magnitude not equal to (shuffle + reduction) factor");
     static_assert(ReductionFactor >= 1, "Reduction factor must be larger than 1");
     static_assert((2 << Magnitude) < 98304, "Shared memory used too much.");
 
@@ -644,7 +658,8 @@ __global__ void ReduceShuffle(Q* q, size_t len, H* cb, H* h, size_t cb_len, uint
 #ifdef DBG
     if (bi == dbg_bi and ti == 0) {
         for (auto ii = 0; ii < (1 << ShuffleFactor); ii++)
-            if (data_src[ii] != 0x0) printf("idx=%3u;\tbw=%3u; code=0b", ii, bw_src[ii]), echo_bitset<H, 32>(data_src[ii]);
+            if (data_src[ii] != 0x0)
+                printf("idx=%3u;\tbw=%3u; code=0b", ii, bw_src[ii]), echo_bitset<H, 32>(data_src[ii]);
         printf("\n");
     }
     __syncthreads();
