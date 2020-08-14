@@ -309,8 +309,8 @@ void exp_wrapper(Qtype* q, unsigned int len, Htype* cb, unsigned int cb_len, uns
     ne3 = new_enc_reduceshufflemerge_prefixsum<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>  // reduce + prefix-sum
         (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
 
-    ne_dryrun = new_enc_findviolating<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>  // reduce + prefix-sum
-        (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                  //
+    ne_dryrun = new_enc_dryrun_findviolating<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>  // reduce + prefix-sum
+        (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                         //
 
     oe = old_enc<Qtype, Htype, Magnitude>  // omp like
         (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);
