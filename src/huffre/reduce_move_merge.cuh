@@ -387,9 +387,9 @@ __global__ void ReduceShuffle_PrefixSum(Q* q, size_t len, H* cb, H* h, size_t cb
     //    }
     //    /* necessary */ __syncthreads();
 
-    auto stride = 1;
-    auto __bw_alt   = bw_src;
-    auto __h    = data_src;
+    auto stride   = 1;
+    auto __bw_alt = bw_src;
+    auto __h      = data_src;
 
     H   sym;
     int bw = 0;
@@ -422,9 +422,9 @@ __global__ void ReduceShuffle_PrefixSum(Q* q, size_t len, H* cb, H* h, size_t cb
         stride >>= 1;
         __syncthreads();
         if (ti < d) {
-            auto l  = stride * (2 * ti + 1) - 1;
-            auto r  = stride * (2 * ti + 2) - 1;
-            auto t  = __bw_alt[l];
+            auto l      = stride * (2 * ti + 1) - 1;
+            auto r      = stride * (2 * ti + 2) - 1;
+            auto t      = __bw_alt[l];
             __bw_alt[l] = __bw_alt[r];
             __bw_alt[r] += t;
         }
@@ -465,13 +465,93 @@ __global__ void ReduceShuffle_PrefixSum(Q* q, size_t len, H* cb, H* h, size_t cb
     multiple_of_128B      = ((multiple_of_128B - 1) / 32 + 1) * 32;
     if (ti < multiple_of_128B) h[chunksize * bi + ti] = data_src[ti];
     __syncthreads();
-} /*
-   * Q* q: quantization code
-   * H* cb: Huffman codebook
-   * TODO (msb) bitwdith (space) Huffman code (lsb)
-   * TODO -> ReduceShuffleMerge
-   * TODO -> chunksize == 2 * blockDim.x
-   */
+}
+
+/*
+ * dry run to figure out the violating
+ * thus we don't have to overkill by marking too many data and covert them to shorter avatars
+ */
+template <typename Q, typename H, int Magnitude, int ReductionFactor, int ShuffleFactor>
+__global__ void TrackViolating(Q* q, size_t len, H* cb, int* outlier_num = nullptr)
+{
+    static_assert(Magnitude == ReductionFactor + ShuffleFactor, "Data magnitude not equal to (shuffle + reduction) factor");
+    static_assert(ReductionFactor >= 1, "Reduction factor must be larger than 1");
+    static_assert((2 << Magnitude) < 98304, "Shared memory used too much.");
+
+    extern __shared__ char __buff[];
+
+    auto n_worker  = blockDim.x;
+    auto chunksize = 1 << Magnitude;
+    // auto __data    = reinterpret_cast<H*>(__buff);
+
+    auto __bw = reinterpret_cast<int*>(__buff + (chunksize / 2 + chunksize / 4) * sizeof(H));
+    // auto data_src  = __data;                  // 1st data zone of (chunksize/2)
+    // auto data_dst  = __data + chunksize / 2;  // 2nd data zone of (chunksize/4)
+    // auto data_exc  = data_src;                // swap zone
+    auto bw_src = __bw;                  // 1st bw zone of (chunksize/2)
+    auto bw_dst = __bw + chunksize / 2;  // 2nd bw zone of (chunksize/4)
+    auto bw_exc = bw_src;                // swap zone
+
+    auto ti = threadIdx.x;
+    auto bi = blockIdx.x;
+
+    //// Reduction I: detach metadata and code; merge as much as possible
+    ////////////////////////////////////////////////////////////////////////////////
+    for (auto r = 0; r < (1 << (ReductionFactor - 1)); r++) {  // ReductionFactor - 1 = 2, 8 -> 4 (1 time)
+        auto lidx = 2 * (ti + n_worker * r);                   // every two
+        auto gidx = chunksize * bi + lidx;                     // to load from global memory
+
+        auto lsym = cb[q[gidx]];
+        auto rsym = cb[q[gidx + 1]];  // the next one
+        __syncthreads();
+
+        auto lbw = get_bw(lsym);
+        auto rbw = get_bw(rsym);
+        // lsym <<= sizeof(H) * 8 - lbw;  // left aligned
+        // rsym <<= sizeof(H) * 8 - rbw;  //
+        // data_src[lidx >> 1] = lsym | (rsym >> lbw);  //
+        bw_src[lidx >> 1] = lbw + rbw;  // sum bitwidths
+    }
+    __syncthreads();
+
+    //// Reduction II: merge as much as possible
+    ////////////////////////////////////////////////////////////////////////////////
+    for (auto rf = ReductionFactor - 2; rf >= 0; rf--) {  // ReductionFactor - 2 = 1, 4 -> 2 -> 1 (2 times)
+        auto repeat = 1 << rf;
+        for (auto r = 0; r < repeat; r++) {
+            auto lidx = 2 * (ti + n_worker * r);
+            // auto lsym = data_src[lidx];
+            // auto rsym = data_src[lidx + 1];
+            auto lbw = bw_src[lidx];
+            auto rbw = bw_src[lidx + 1];
+            // data_dst[lidx >> 1] = lsym | (rsym >> lbw);
+            bw_dst[lidx >> 1] = lbw + rbw;  // sum bitwidths
+            __syncthreads();
+        }
+        __syncthreads();
+
+        bw_exc = bw_src;
+        bw_src = bw_dst;
+        bw_dst = bw_exc;
+        __syncthreads();
+    }
+    __syncthreads();
+
+    if (bw_src[ti] > 32) atomicAdd(outlier_num, 1 << ReductionFactor);
+}
+
+__global__ void ReadViolating(int* outlier_num, size_t len)
+{
+    printf("the violating number is %d, %lf %\n", outlier_num[0], outlier_num[0] * 1.0 / len);
+}
+
+/*
+ * Q* q: quantization code
+ * H* cb: Huffman codebook
+ * TODO (msb) bitwdith (space) Huffman code (lsb)
+ * TODO -> ReduceShuffleMerge
+ * TODO -> chunksize == 2 * blockDim.x
+ */
 template <typename Q, typename H, int Magnitude, int ReductionFactor, int ShuffleFactor>
 __global__ void ReduceShuffle(Q* q, size_t len, H* cb, H* h, size_t cb_len, uint32_t* hmeta, char* rich_dbg = nullptr, uint32_t dbg_bi = 3)
 {
