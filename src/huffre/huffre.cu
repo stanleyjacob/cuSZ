@@ -134,6 +134,39 @@ new_enc_reduceshufflemerge_prefixsum(Q* q, uint32_t len, H* cb, uint32_t cb_len,
 
 template <typename Q, typename H, int Magnitude, int ReductionFactor, int ShuffleFactor>
 std::tuple<uint32_t, H*, uint32_t*>
+new_enc_dryrun_findviolating(Q* q, uint32_t len, H* cb, uint32_t cb_len, /*H* h, uint32_t* hmeta,*/ uint32_t dummy_nchunk_, bool use_dummylen = false)
+{
+    // TODO auto d_rich_dbg = mem::CreateCUDASpace<char>(len * 4);
+    auto d_q       = mem::CreateDeviceSpaceAndMemcpyFromHost(q, len);
+    auto d_cb      = mem::CreateDeviceSpaceAndMemcpyFromHost(cb, cb_len);
+    auto d_h       = mem::CreateCUDASpace<H>(len);
+    auto chunksize = 1 << Magnitude;
+    if (use_dummylen) len = dummy_nchunk_ * chunksize;
+    auto blockDim   = 1 << ShuffleFactor;
+    auto gridDim    = len / chunksize;
+    auto buff_bytes = (chunksize / 2 + chunksize / 4) * (sizeof(H) + sizeof(int));
+    // share memory usage: 1.5 * chunksize * 4 = 6 * chunksize: 6 * 1K = 6K
+    // data size: sizeof(uint16_t) * chunksize: 2 * 1024
+    // thread number : chunksize >> 3, 128, at max 2* 1024 / 128 = 16 threadblocks on 1 SM
+    cout << "len     \t" << len << endl;
+    cout << "chunksize\t" << chunksize << endl;
+    cout << "blockDim\t" << blockDim << endl;
+    cout << "gridDim \t" << gridDim << endl;
+    cout << "per-block shmem bytes\t" << buff_bytes << "\t" << 96 * 1024 / buff_bytes << " blocks EXPECTED on 1 SM" << endl;
+    cout << 1024 * 2 / blockDim << " should be blocks on 1 SM" << endl;
+    auto d_hmeta = mem::CreateCUDASpace<uint32_t>(gridDim);          // chunkwise metadata
+    TrackViolating<Q, H, Magnitude, ReductionFactor, ShuffleFactor>  //
+        <<<gridDim, blockDim, buff_bytes>>>(d_q, len, d_cb, d_h, cb_len, d_hmeta, nullptr, dbg_bi);
+    HANDLE_ERROR(cudaDeviceSynchronize());
+    auto h     = mem::CreateHostSpaceAndMemcpyFromDevice(d_h, len);
+    auto hmeta = mem::CreateHostSpaceAndMemcpyFromDevice(d_hmeta, gridDim);
+    cudaFree(d_q), cudaFree(d_cb), cudaFree(d_h), cudaFree(d_hmeta);
+    cout << "new enc gracefully quited." << endl;
+    return {gridDim, h, hmeta};
+}
+
+template <typename Q, typename H, int Magnitude, int ReductionFactor, int ShuffleFactor>
+std::tuple<uint32_t, H*, uint32_t*>
 new_enc_reduceshufflemerge(Q* q, uint32_t len, H* cb, uint32_t cb_len, /*H* h, uint32_t* hmeta,*/ uint32_t dummy_nchunk_, bool use_dummylen = false)
 {
     // TODO auto d_rich_dbg = mem::CreateCUDASpace<char>(len * 4);
@@ -261,7 +294,7 @@ void check_afterward(
 template <typename Qtype, typename Htype, unsigned int Magnitude, unsigned int ReductionFactor>
 void exp_wrapper(Qtype* q, unsigned int len, Htype* cb, unsigned int cb_len, unsigned int dummy_nchunk, double avg_bw)
 {
-    std::tuple<uint32_t, Htype*, uint32_t*> ne1, ne2, ne3;
+    std::tuple<uint32_t, Htype*, uint32_t*> ne1, ne2, ne3, ne_dryrun;
     std::tuple<uint32_t, Htype*, size_t*>   oe;
 
     const auto ChunkSize     = 1 << Magnitude;
@@ -275,7 +308,11 @@ void exp_wrapper(Qtype* q, unsigned int len, Htype* cb, unsigned int cb_len, uns
         (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
     ne3 = new_enc_reduceshufflemerge_prefixsum<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>  // reduce + prefix-sum
         (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                           //
-    oe = old_enc<Qtype, Htype, Magnitude>                                                                // omp like
+
+    ne_dryrun = new_enc_findviolating<Qtype, Htype, Magnitude, ReductionFactor, ShuffleFactor>  // reduce + prefix-sum
+        (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);                                  //
+
+    oe = old_enc<Qtype, Htype, Magnitude>  // omp like
         (q, len, cb, cb_len, dummy_nchunk, dummy_nchunk != 0);
 
     check_afterward(ne1, oe, len, avg_bw, ChunkSize, /* override the checked blk # */ 0);
