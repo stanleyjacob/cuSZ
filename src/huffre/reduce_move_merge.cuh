@@ -545,7 +545,7 @@ __global__ void TrackViolating(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
 
     if (bw_src[ti] > 32) atomicAdd(&counter, 1 << ReductionFactor);
     __syncthreads();
-    if (ti == 0) atomicAdd(&outlier_num, &counter);
+    if (ti == 0) atomicAdd(&outlier_num, counter);
 }
 
 __global__ void PrepareReadViolating()
