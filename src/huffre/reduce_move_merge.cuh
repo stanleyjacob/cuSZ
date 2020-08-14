@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include "auxiliary.cuh"
 
+__device__ int outlier_num;
+
 // https://stackoverflow.com/questions/42309369/can-my-kernel-code-tell-how-much-shared-memory-it-has-available
 // usage: if (ti == 0) printf("shared memory size: %u\n", dynamic_smem_size());
 __forceinline__ __device__ unsigned dynamic_smem_size()
@@ -489,6 +491,9 @@ __global__ void TrackViolating(Q* q, size_t len, H* cb, int* outlier_num = nullp
     auto n_worker  = blockDim.x;
     auto chunksize = 1 << Magnitude;
     // auto __data    = reinterpret_cast<H*>(__buff);
+    auto _counter = reinterpret_cast<int*>(__buff);
+    auto counter  = _counter[0];
+
     auto __bw = reinterpret_cast<int*>(__buff + (chunksize / 2 + chunksize / 4) * sizeof(H));
     // auto data_src  = __data;                  // 1st data zone of (chunksize/2)
     // auto data_dst  = __data + chunksize / 2;  // 2nd data zone of (chunksize/4)
