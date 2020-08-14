@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include "auxiliary.cuh"
 
+__device__ int outlier_num;
+
 // https://stackoverflow.com/questions/42309369/can-my-kernel-code-tell-how-much-shared-memory-it-has-available
 // usage: if (ti == 0) printf("shared memory size: %u\n", dynamic_smem_size());
 __forceinline__ __device__ unsigned dynamic_smem_size()
@@ -483,6 +485,9 @@ __global__ void TrackViolating(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
     auto n_worker  = blockDim.x;
     auto chunksize = 1 << Magnitude;
     // auto __data    = reinterpret_cast<H*>(__buff);
+    auto _counter = reinterpret_cast<int*>(__buff);
+    auto counter  = _counter[0];
+
     auto __bw = reinterpret_cast<int*>(__buff + (chunksize / 2 + chunksize / 4) * sizeof(H));
     // auto data_src  = __data;                  // 1st data zone of (chunksize/2)
     // auto data_dst  = __data + chunksize / 2;  // 2nd data zone of (chunksize/4)
@@ -537,6 +542,20 @@ __global__ void TrackViolating(Q* q, size_t len, H* cb, H* h, size_t cb_len, uin
         __syncthreads();
     }
     __syncthreads();
+
+    if (bw_src[ti] > 32) atomicAdd(&counter, 1 << ReductionFactor);
+    __syncthreads();
+    if (ti == 0) atomicAdd(&outlier_num, &counter);
+}
+
+__global__ void PrepareReadViolating()
+{
+    outlier_num = 0;
+}
+
+__global__ void ReadViolating(size_t len)
+{
+    printf("the violating number is %d, %lf %", outlier_num, outlier_num * 1.0 / len);
 }
 
 /*

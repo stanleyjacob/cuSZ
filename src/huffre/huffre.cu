@@ -154,10 +154,18 @@ new_enc_dryrun_findviolating(Q* q, uint32_t len, H* cb, uint32_t cb_len, /*H* h,
     cout << "gridDim \t" << gridDim << endl;
     cout << "per-block shmem bytes\t" << buff_bytes << "\t" << 96 * 1024 / buff_bytes << " blocks EXPECTED on 1 SM" << endl;
     cout << 1024 * 2 / blockDim << " should be blocks on 1 SM" << endl;
-    auto d_hmeta = mem::CreateCUDASpace<uint32_t>(gridDim);          // chunkwise metadata
+    auto d_hmeta = mem::CreateCUDASpace<uint32_t>(gridDim);  // chunkwise metadata
+
+    PrepareReadViolating<<<1, 1>>>();
+    HANDLE_ERROR(cudaDeviceSynchronize());
+
     TrackViolating<Q, H, Magnitude, ReductionFactor, ShuffleFactor>  //
         <<<gridDim, blockDim, buff_bytes>>>(d_q, len, d_cb, d_h, cb_len, d_hmeta, nullptr, dbg_bi);
     HANDLE_ERROR(cudaDeviceSynchronize());
+
+    ReadViolating<<<1, 1>>>(len);
+    HANDLE_ERROR(cudaDeviceSynchronize());
+
     auto h     = mem::CreateHostSpaceAndMemcpyFromDevice(d_h, len);
     auto hmeta = mem::CreateHostSpaceAndMemcpyFromDevice(d_hmeta, gridDim);
     cudaFree(d_q), cudaFree(d_cb), cudaFree(d_h), cudaFree(d_hmeta);
