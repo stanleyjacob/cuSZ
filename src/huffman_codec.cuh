@@ -16,16 +16,16 @@
 
 #include <stddef.h>
 
-template <typename Q, typename H>
-__global__ void EncodeFixedLen(Q*, H*, size_t, H*);
+template <typename Quant, typename Huff>
+__global__ void EncodeFixedLen(Quant*, Huff*, size_t, Huff*);
 
-template <typename Q>
-__global__ void Deflate(Q*, size_t, size_t*, int);
+template <typename Quant>
+__global__ void Deflate(Quant*, size_t, size_t*, int);
 
-template <typename H, typename T>
-__device__ void InflateChunkwise(H*, T*, size_t, uint8_t*);
+template <typename Huff, typename T>
+__device__ void InflateChunkwise(Huff*, T*, size_t, uint8_t*);
 
-template <typename Q, typename H>
-__global__ void Decode(H*, size_t*, Q*, size_t, int, int, uint8_t*, size_t);
+template <typename Quant, typename Huff>
+__global__ void Decode(Huff*, size_t*, Quant*, size_t, int, int, uint8_t*, size_t);
 
 #endif

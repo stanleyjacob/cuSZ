@@ -23,8 +23,8 @@ size_t dims_HACC_4GB[]    = {1073726487, 1, 1, 1, 1};
 size_t dims_CESM[]        = {3600, 1800, 1, 1, 2};
 size_t dims_Hurricane[]   = {500, 500, 100, 1, 3};
 size_t dims_NYX[]         = {512, 512, 512, 1, 3};
-size_t dims_QMCPACK1[]    = {288, 69, 7935, 1, 3};
-size_t dims_QMCPACK2[]    = {69, 69, 33120, 1, 3};
+size_t dims_QMC[]         = {288, 69, 7935, 1, 3};
+size_t dims_QMCpre[]      = {69, 69, 33120, 1, 3};
 size_t dims_EXAFEL_demo[] = {388, 59200, 1, 1, 2};
 size_t dims_ARAMCO[]      = {235, 849, 849, 1, 3};
 
@@ -45,8 +45,8 @@ size_t* InitializeDemoDims(
             {std::string("cesm"), dims_CESM},
             {std::string("hurricane"), dims_Hurricane},
             {std::string("nyx"), dims_NYX},
-            {std::string("qmc"), dims_QMCPACK1},
-            {std::string("qmcpre"), dims_QMCPACK2},
+            {std::string("qmc"), dims_QMC},
+            {std::string("qmcpre"), dims_QMCpre},
             {std::string("exafeldemo"), dims_EXAFEL_demo},
             {std::string("aramco"), dims_ARAMCO}};
 

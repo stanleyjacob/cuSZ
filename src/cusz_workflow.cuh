@@ -22,7 +22,7 @@ using namespace std;
 namespace cusz {
 namespace workflow {
 
-template <typename T, typename Q, typename H>
+template <typename Data, typename Quant, typename Huff>
 void Compress(
     argpack* ap,
     size_t*  dims_L16,
@@ -32,7 +32,7 @@ void Compress(
     size_t&  n_uInt,
     size_t&  huffman_metadata_size);
 
-template <typename T, typename Q, typename H>
+template <typename Data, typename Quant, typename Huff>
 void Decompress(
     argpack* ap,
     size_t*  dims_L16,
@@ -48,14 +48,14 @@ namespace impl {
 
 inline size_t GetEdgeOfReinterpretedSquare(size_t l) { return static_cast<size_t>(ceil(sqrt(l))); };
 
-template <typename T, typename Q>
-void PdQ(T*, Q*, size_t*, double*);
+template <typename Data, typename Quant>
+void PdQ(Data*, Quant*, size_t*, double*);
 
-template <typename T, typename Q>
-void ReversedPdQ(T*, Q*, T*, size_t*, double);
+template <typename Data, typename Quant>
+void ReversedPdQ(Data*, Quant*, Data*, size_t*, double);
 
-template <typename T, typename Q>
-void VerifyHuffman(string const&, size_t, Q*, int, size_t*, double*);
+template <typename Data, typename Quant>
+void VerifyHuffman(string const&, size_t, Quant*, int, size_t*, double*);
 
 }  // namespace impl
 
