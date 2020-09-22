@@ -15,7 +15,9 @@
 #include "argparse2_doc.hh"
 #include "argparse2_huff.hh"
 
-using std::cout, std::cerr, std::endl;
+using std::cerr;
+using std::cout;
+using std::endl;
 
 void HuffmanArgParser::parse(int argc, char** argv)
 {

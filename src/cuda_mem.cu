@@ -11,7 +11,6 @@
  *
  */
 
-#include <bits/stdint-uintn.h>
 #include <cuda_runtime.h>
 #include <cassert>
 #include <cstddef>

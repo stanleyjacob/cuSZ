@@ -26,7 +26,9 @@ ifeq ($(shell test $(CUDA_MAJV) -ge 10; echo $$?), 0)
 endif
 
 ifeq ($(shell test $(CUDA_MAJV) -ge 11; echo $$?), 0)
-  DEPLOY += $(GPU_AMPERE)
+#  temporarily comment out before new GPUs arrive
+#  DEPLOY += $(GPU_AMPERE_A100)
+#  DEPLOY += $(GPU_AMPERE_RTX)
 endif
 
 CCFLAGS   := $(STD) -O3
