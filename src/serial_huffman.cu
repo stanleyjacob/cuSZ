@@ -15,7 +15,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include "huffman.cuh"
+#include "serial_huffman.cuh"
 
 using namespace std;
 template <typename T, typename Q>
