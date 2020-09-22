@@ -6,7 +6,7 @@
  * @author Jiannan Tian
  * @brief Workflow of cuSZ (header).
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on: 2020-02-12
  *
  * @copyright (C) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
@@ -20,7 +20,7 @@
 using namespace std;
 
 namespace cusz {
-namespace workflow {
+namespace interface {
 
 template <typename Data, typename Quant, typename Huff>
 void Compress(
@@ -42,7 +42,7 @@ void Decompress(
     size_t&  total_uInt,
     size_t&  huffman_metadata_size);
 
-}  // namespace workflow
+}  // namespace interface
 
 namespace impl {
 

@@ -3,7 +3,7 @@
  * @author Jiannan Tian
  * @brief Driver program of cuSZ.
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on 2019-12-30
  *
  * @copyright (C) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
@@ -106,18 +106,18 @@ int main(int argc, char** argv)
     if (ap->to_archive or ap->to_dryrun) {  // fp32 only for now
         if (ap->quant_rep == 8) {
             if (ap->huffman_rep == 32)
-                cusz::workflow::Compress<float, uint8_t, uint32_t>(
+                cusz::interface::Compress<float, uint8_t, uint32_t>(
                     ap, dim_array, eb_array, nnz_outlier, total_bits, total_uInt, huff_meta_size);
             else
-                cusz::workflow::Compress<float, uint8_t, uint64_t>(
+                cusz::interface::Compress<float, uint8_t, uint64_t>(
                     ap, dim_array, eb_array, nnz_outlier, total_bits, total_uInt, huff_meta_size);
         }
         else if (ap->quant_rep == 16) {
             if (ap->huffman_rep == 32)
-                cusz::workflow::Compress<float, uint16_t, uint32_t>(
+                cusz::interface::Compress<float, uint16_t, uint32_t>(
                     ap, dim_array, eb_array, nnz_outlier, total_bits, total_uInt, huff_meta_size);
             else
-                cusz::workflow::Compress<float, uint16_t, uint64_t>(
+                cusz::interface::Compress<float, uint16_t, uint64_t>(
                     ap, dim_array, eb_array, nnz_outlier, total_bits, total_uInt, huff_meta_size);
         }
 
@@ -144,16 +144,15 @@ int main(int argc, char** argv)
 
     // wenyu's modification
     // invoke system() to untar archived files first before decompression
-    
-    string cx_directory = ap->cx_path2file.substr(0,ap->cx_path2file.rfind("/") + 1);
+
+    string cx_directory = ap->cx_path2file.substr(0, ap->cx_path2file.rfind("/") + 1);
     if (ap->to_extract) {
         string cmd_string;
-	if(cx_directory.length()==0){
-	    cmd_string = "tar -xf " + ap->cx_path2file+".sz";
-	} else {
-	    cmd_string = "tar -xf " + ap->cx_path2file+".sz" +" -C "+cx_directory;
-	}
-        char*  cmd        = new char[cmd_string.length() + 1];
+        if (cx_directory.length() == 0) { cmd_string = "tar -xf " + ap->cx_path2file + ".sz"; }
+        else {
+            cmd_string = "tar -xf " + ap->cx_path2file + ".sz" + " -C " + cx_directory;
+        }
+        char* cmd = new char[cmd_string.length() + 1];
         strcpy(cmd, cmd_string.c_str());
         system(cmd);
         delete[] cmd;
@@ -175,18 +174,18 @@ int main(int argc, char** argv)
 
         if (ap->quant_rep == 8) {
             if (ap->huffman_rep == 32)
-                cusz::workflow::Decompress<float, uint8_t, uint32_t>(
+                cusz::interface::Decompress<float, uint8_t, uint32_t>(
                     ap, dim_array, eb_array, nnz_outlier, total_bits, total_uInt, huff_meta_size);
             else
-                cusz::workflow::Decompress<float, uint8_t, uint64_t>(
+                cusz::interface::Decompress<float, uint8_t, uint64_t>(
                     ap, dim_array, eb_array, nnz_outlier, total_bits, total_uInt, huff_meta_size);
         }
         else if (ap->quant_rep == 16) {
             if (ap->huffman_rep == 32)
-                cusz::workflow::Decompress<float, uint16_t, uint32_t>(
+                cusz::interface::Decompress<float, uint16_t, uint32_t>(
                     ap, dim_array, eb_array, nnz_outlier, total_bits, total_uInt, huff_meta_size);
             else
-                cusz::workflow::Decompress<float, uint16_t, uint64_t>(
+                cusz::interface::Decompress<float, uint16_t, uint64_t>(
                     ap, dim_array, eb_array, nnz_outlier, total_bits, total_uInt, huff_meta_size);
         }
     }
@@ -207,13 +206,16 @@ int main(int argc, char** argv)
         delete[] cmd;
 
         // using tar command to encapsulate files
-        
-        if(ap->to_gzip){
-            cmd_string = "cd " + ap->opath + ";tar -czf " + cx_basename + ".sz " + cx_basename + ".hbyte " + cx_basename +
-                     ".outlier " + cx_basename + ".canon " + cx_basename + ".hmeta " + cx_basename + ".yamp";
-        } else {
-            cmd_string = "cd " + ap->opath + ";tar -cf " + cx_basename + ".sz " + cx_basename + ".hbyte " + cx_basename +
-                     ".outlier " + cx_basename + ".canon " + cx_basename + ".hmeta " + cx_basename + ".yamp";
+
+        if (ap->to_gzip) {
+            cmd_string = "cd " + ap->opath + ";tar -czf " + cx_basename + ".sz " + cx_basename + ".hbyte " +
+                         cx_basename + ".outlier " + cx_basename + ".canon " + cx_basename + ".hmeta " + cx_basename +
+                         ".yamp";
+        }
+        else {
+            cmd_string = "cd " + ap->opath + ";tar -cf " + cx_basename + ".sz " + cx_basename + ".hbyte " +
+                         cx_basename + ".outlier " + cx_basename + ".canon " + cx_basename + ".hmeta " + cx_basename +
+                         ".yamp";
         }
 
         cmd = new char[cmd_string.length() + 1];

@@ -3,7 +3,7 @@
  * @author Jiannan Tian
  * @brief Workflow of cuSZ.
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on: 2020-02-12
  *
  * @copyright (C) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
@@ -63,51 +63,36 @@ void cusz::impl::PdQ(Data* d_data, Quant* d_q, size_t* dims_L16, double* ebs_L4)
     auto  d_ebs_L4   = mem::CreateDeviceSpaceAndMemcpyFromHost(ebs_L4, 4);
     void* args[]     = {&d_data, &d_q, &d_dims_L16, &d_ebs_L4};
 
-    // testing constant memory
-    // auto dims_inttype = new int[16];
-    // for (auto i = 0; i < 16; i++) dims_inttype[i] = dims_L16[i];
-    // cudaMemcpyToSymbol(symb_dims, dims_inttype, 16 * sizeof(int), 0, cudaMemcpyHostToDevice);
-    // cudaMemcpyToSymbol(symb_ebs, ebs_L4, 4 * sizeof(double), 0, cudaMemcpyHostToDevice);
-    // void* args2[] = {&d_data, &d_q}; unreferenced
-
     if (dims_L16[nDIM] == 1) {
-        dim3 blockNum(dims_L16[nBLK0]);
-        dim3 threadNum(gpu_B_1d);
+        dim3 grid_dim(dims_L16[nBLK0]);
+        dim3 block_dim(gpu_B_1d);
         cudaLaunchKernel(
-            (void*)cusz::PdQ::c_lorenzo_1d1l<Data, Quant, gpu_B_1d>,  //
-            blockNum, threadNum, args, 0, nullptr);
-        /*
-        cudaLaunchKernel(
-            (void*)cusz::PdQ::c_lorenzo_1d1l<T, Q, gpu_B_1d>,  //
-            blockNum, threadNum, args2, gpu_B_1d * sizeof(T), nullptr);
-        */
+            (void*)cusz::predictor_quantizer::c_lorenzo_1d1l<Data, Quant, gpu_B_1d>,  //
+            grid_dim, block_dim, args, 0, nullptr);
     }
     else if (dims_L16[nDIM] == 2) {
-        dim3 blockNum(dims_L16[nBLK0], dims_L16[nBLK1]);
-        dim3 threadNum(gpu_B_2d, gpu_B_2d);
+        dim3 grid_dim(dims_L16[nBLK0], dims_L16[nBLK1]);
+        dim3 block_dim(gpu_B_2d, gpu_B_2d);
+        // old, use physical padding
+        // cudaLaunchKernel(
+        //     (void*)cusz::predictor_quantizer::c_lorenzo_2d1l<Data, Quant, gpu_B_2d>,  //
+        //     grid_dim, block_dim, args, (gpu_B_2d + 1) * (gpu_B_2d + 1) * sizeof(Data), nullptr);
+        // new, use virtual padding
         cudaLaunchKernel(
-            (void*)cusz::PdQ::c_lorenzo_2d1l<Data, Quant, gpu_B_2d>,  //
-            blockNum, threadNum, args, (gpu_B_2d + 1) * (gpu_B_2d + 1) * sizeof(Data), nullptr);
-        /*
-        cudaLaunchKernel(
-            (void*)cusz::PdQ::c_lorenzo_2d1l<T, Q, gpu_B_2d>,  //
-            blockNum, threadNum, args2, (gpu_B_2d) * (gpu_B_2d) * sizeof(T), nullptr);
-        */
+            (void*)cusz::predictor_quantizer::c_lorenzo_2d1l_virtual_padding<Data, Quant, gpu_B_2d>,  //
+            grid_dim, block_dim, args, (gpu_B_2d) * (gpu_B_2d) * sizeof(Data), nullptr);
     }
     else if (dims_L16[nDIM] == 3) {
-        dim3 blockNum(dims_L16[nBLK0], dims_L16[nBLK1], dims_L16[nBLK2]);
-        dim3 threadNum(gpu_B_3d, gpu_B_3d, gpu_B_3d);
+        dim3 grid_dim(dims_L16[nBLK0], dims_L16[nBLK1], dims_L16[nBLK2]);
+        dim3 block_dim(gpu_B_3d, gpu_B_3d, gpu_B_3d);
+        // old, use physical padding
+        // cudaLaunchKernel(
+        //     (void*)cusz::predictor_quantizer::c_lorenzo_3d1l<Data, Quant, gpu_B_3d>,  //
+        //     grid_dim, block_dim, args, (gpu_B_3d + 1) * (gpu_B_3d + 1) * (gpu_B_3d + 1) * sizeof(Data), nullptr);
+        // new, use virtual padding
         cudaLaunchKernel(
-            (void*)cusz::PdQ::c_lorenzo_3d1l<Data, Quant, gpu_B_3d>,  //
-            blockNum, threadNum, args, (gpu_B_3d + 1) * (gpu_B_3d + 1) * (gpu_B_3d + 1) * sizeof(Data), nullptr);
-        /*
-        cudaLaunchKernel(
-            (void*)cusz::PdQ::c_lorenzo_3d1l_new<T, Q, gpu_B_3d>,  //
-            blockNum, threadNum, args2, (gpu_B_3d + 1) * (gpu_B_3d + 1) * (gpu_B_3d + 1) * sizeof(T), nullptr);
-        cudaLaunchKernel(
-            (void*)cusz::PdQ::c_lorenzo_3d1l<T, Q, gpu_B_3d>,  //
-            blockNum, threadNum, args2, (gpu_B_3d) * (gpu_B_3d) * (gpu_B_3d) * sizeof(T), nullptr);
-        */
+            (void*)cusz::predictor_quantizer::c_lorenzo_3d1l_virtual_padding<Data, Quant, gpu_B_3d>,  //
+            grid_dim, block_dim, args, (gpu_B_3d) * (gpu_B_3d) * (gpu_B_3d) * sizeof(Data), nullptr);
     }
     HANDLE_ERROR(cudaDeviceSynchronize());
 }
@@ -130,28 +115,28 @@ void cusz::impl::ReversedPdQ(Data* d_xdata, Quant* d_q, Data* d_outlier, size_t*
 
         dim3 thread_num(p);
         dim3 block_num((dims_L16[nBLK0] - 1) / p + 1);
-        cudaLaunchKernel((void*)PdQ::x_lorenzo_1d1l<Data, Quant, gpu_B_1d>, block_num, thread_num, args, 0, nullptr);
+        cudaLaunchKernel(                                                             //
+            (void*)cusz::predictor_quantizer::x_lorenzo_1d1l<Data, Quant, gpu_B_1d>,  //
+            block_num, thread_num, args, 0, nullptr);
     }
     else if (dims_L16[nDIM] == 2) {
         const static size_t p = gpu_B_2d;
 
         dim3 thread_num(p, p);
-        dim3 block_num(
-            (dims_L16[nBLK0] - 1) / p + 1,   //
-            (dims_L16[nBLK1] - 1) / p + 1);  //
-        cudaLaunchKernel((void*)PdQ::x_lorenzo_2d1l<Data, Quant, gpu_B_2d>, block_num, thread_num, args, 0, nullptr);
+        dim3 block_num(((dims_L16[nBLK0] - 1) / p + 1), ((dims_L16[nBLK1] - 1) / p + 1));
+        cudaLaunchKernel(                                                             //
+            (void*)cusz::predictor_quantizer::x_lorenzo_2d1l<Data, Quant, gpu_B_2d>,  //
+            block_num, thread_num, args, 0, nullptr);
     }
     else if (dims_L16[nDIM] == 3) {
         const static size_t p = gpu_B_3d;
 
         dim3 thread_num(p, p, p);
         dim3 block_num(
-            (dims_L16[nBLK0] - 1) / p + 1,   //
-            (dims_L16[nBLK1] - 1) / p + 1,   //
-            (dims_L16[nBLK2] - 1) / p + 1);  //
-        cudaLaunchKernel((void*)PdQ::x_lorenzo_3d1l<Data, Quant, gpu_B_3d>, block_num, thread_num, args, 0, nullptr);
-        // PdQ::x_lorenzo_3d1l<T, Q, gpu_B_3d><<<block_num, thread_num>>>(d_xdata, d_outlier, d_q, d_dims_L16,
-        // _2eb);
+            ((dims_L16[nBLK0] - 1) / p + 1), ((dims_L16[nBLK1] - 1) / p + 1), ((dims_L16[nBLK2] - 1) / p + 1));
+        cudaLaunchKernel(                                                             //
+            (void*)cusz::predictor_quantizer::x_lorenzo_3d1l<Data, Quant, gpu_B_3d>,  //
+            block_num, thread_num, args, 0, nullptr);
     }
     else {
         cerr << log_err << "no 4D" << endl;
@@ -226,7 +211,7 @@ void cusz::impl::VerifyHuffman(
 }
 
 template <typename Data, typename Quant, typename Huff>
-void cusz::workflow::Compress(
+void cusz::interface::Compress(
     argpack* ap,
     size_t*  dims_L16,
     double*  ebs_L4,
@@ -276,7 +261,7 @@ void cusz::workflow::Compress(
     }
 
     std::tie(n_bits, n_uInt, huffman_metadata_size) =
-        HuffmanEncode<Quant, Huff>(ap->c_huff_base, d_q, len, ap->huffman_chunk, dims_L16[CAP]);
+        lossless::interface::HuffmanEncode<Quant, Huff>(ap->c_huff_base, d_q, len, ap->huffman_chunk, dims_L16[CAP]);
 
     cout << log_info << "Compression finished, saved Huffman encoded quant.code.\n";
 
@@ -286,7 +271,7 @@ void cusz::workflow::Compress(
 }
 
 template <typename Data, typename Quant, typename Huff>
-void cusz::workflow::Decompress(
+void cusz::interface::Decompress(
     argpack* ap,
     size_t*  dims_L16,
     double*  ebs_L4,
@@ -310,7 +295,8 @@ void cusz::workflow::Decompress(
     }
     else {
         cout << log_info << "Huffman decoding into quant.code." << endl;
-        xq = HuffmanDecode<Quant, Huff>(ap->cx_path2file, len, ap->huffman_chunk, total_uInt, dict_size);
+        xq = lossless::interface::HuffmanDecode<Quant, Huff>(
+            ap->cx_path2file, len, ap->huffman_chunk, total_uInt, dict_size);
         if (ap->verify_huffman) {
             // TODO check in argpack
             if (ap->x_fi_origin == "") {
@@ -401,19 +387,19 @@ void cusz::workflow::Decompress(
 }
 
 template void
-cusz::workflow::Compress<float, uint8__t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+cusz::interface::Compress<float, uint8__t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
 template void
-cusz::workflow::Compress<float, uint8__t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+cusz::interface::Compress<float, uint8__t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
 template void
-cusz::workflow::Compress<float, uint16_t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+cusz::interface::Compress<float, uint16_t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
 template void
-cusz::workflow::Compress<float, uint16_t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+cusz::interface::Compress<float, uint16_t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
 
 template void
-cusz::workflow::Decompress<float, uint8__t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+cusz::interface::Decompress<float, uint8__t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
 template void
-cusz::workflow::Decompress<float, uint8__t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+cusz::interface::Decompress<float, uint8__t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
 template void
-cusz::workflow::Decompress<float, uint16_t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+cusz::interface::Decompress<float, uint16_t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
 template void
-cusz::workflow::Decompress<float, uint16_t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+cusz::interface::Decompress<float, uint16_t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);

@@ -3,7 +3,7 @@
  * @author Cody Rivera (cjrivera1@crimson.ua.edu), Megan Hickman Fulp (mlhickm@g.clemson.edu)
  * @brief Fast histogramming from [Gómez-Luna et al. 2013]
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on 2020-02-16
  *
  * @copyright (C) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
@@ -21,7 +21,7 @@
 
 using uint8__t = uint8_t;
 
-__global__ void naiveHistogram(int input_data[], int output[], int N, int symbols_per_thread)
+__global__ void data_process::reduce::naiveHistogram(int input_data[], int output[], int N, int symbols_per_thread)
 {
     unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
     unsigned int j;
@@ -40,7 +40,7 @@ __global__ void naiveHistogram(int input_data[], int output[], int N, int symbol
 #define MIN(a, b) ((a) < (b)) ? (a) : (b)
 
 template <typename UInt1, typename UInt2>
-__global__ void p2013Histogram(UInt1* input_data, UInt2* output, size_t N, int bins, int R)
+__global__ void data_process::reduce::p2013Histogram(UInt1* in_data, UInt2* out_freq, size_t N, int bins, int R)
 {
     extern __shared__ int Hs[/*(bins + 1) * R*/];
 
@@ -62,7 +62,7 @@ __global__ void p2013Histogram(UInt1* input_data, UInt2* output, size_t N, int b
     __syncthreads();
 
     for (unsigned int i = begin; i < end; i += step) {
-        int d = input_data[i];
+        int d = in_data[i];
         atomicAdd(&Hs[off_rep + d], 1);
     }
 
@@ -71,13 +71,13 @@ __global__ void p2013Histogram(UInt1* input_data, UInt2* output, size_t N, int b
     for (unsigned int pos = threadIdx.x; pos < bins; pos += blockDim.x) {
         int sum = 0;
         for (int base = 0; base < (bins + 1) * R; base += bins + 1) { sum += Hs[base + pos]; }
-        atomicAdd(output + pos, sum);
+        atomicAdd(out_freq + pos, sum);
     }
 }
 
 template __global__ void
-p2013Histogram<uint8__t, unsigned int>(uint8__t* input_data, unsigned int* output, size_t N, int bins, int R);
+data_process::reduce::p2013Histogram<uint8__t, unsigned int>(uint8__t*, unsigned int*, size_t, int, int);
 template __global__ void
-p2013Histogram<uint16_t, unsigned int>(uint16_t* input_data, unsigned int* output, size_t N, int bins, int R);
+data_process::reduce::p2013Histogram<uint16_t, unsigned int>(uint16_t*, unsigned int*, size_t, int, int);
 template __global__ void
-p2013Histogram<uint32_t, unsigned int>(uint32_t* input_data, unsigned int* output, size_t N, int bins, int R);
+data_process::reduce::p2013Histogram<uint32_t, unsigned int>(uint32_t*, unsigned int*, size_t, int, int);

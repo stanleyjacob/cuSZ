@@ -3,7 +3,7 @@
  * @author Jiannan Tian
  * @brief Canonization of existing Huffman codebook.
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on 2020-04-10
  *
  * @copyright (C) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory

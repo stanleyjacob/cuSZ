@@ -3,7 +3,7 @@
  * @author Jiannan Tian
  * @brief cuSZ dryrun mode, checking data quality from lossy compression.
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on 2020-05-14
  *
  * @copyright (C) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
@@ -80,7 +80,7 @@ __global__ void cusz::dryrun::lorenzo_3d1l(Data* data, size_t* dims_L16, double*
 }
 
 template <typename Data>
-void cusz::workflow::DryRun(Data* d, Data* d_d, string fi, size_t* dims, double* ebs)
+void cusz::interface::DryRun(Data* d, Data* d_d, string fi, size_t* dims, double* ebs)
 {
     cout << log_info << "Entering dry-run mode..." << endl;
     auto len        = dims[LEN];
@@ -120,12 +120,12 @@ template __global__ void cusz::dryrun::lorenzo_1d1l<float>(float*, size_t*, doub
 template __global__ void cusz::dryrun::lorenzo_2d1l<float>(float*, size_t*, double*);
 template __global__ void cusz::dryrun::lorenzo_3d1l<float>(float*, size_t*, double*);
 
-template void cusz::workflow::DryRun<float>(float* d, float* d_d, string fi, size_t* dims, double* ebs);
+template void cusz::interface::DryRun<float>(float* d, float* d_d, string fi, size_t* dims, double* ebs);
 /*
-template void cusz::workflow::DryRun<double>(double* d, double* d_d, string fi, size_t* dims, double* ebs);
-template void cusz::workflow::DryRun<char>(char* d, char* d_d, string fi, size_t* dims, double* ebs);
-template void cusz::workflow::DryRun<short>(short* d, short* d_d, string fi, size_t* dims, double* ebs);
-template void cusz::workflow::DryRun<int>(int* d, int* d_d, string fi, size_t* dims, double* ebs);
-template void cusz::workflow::DryRun<long>(long* d, long* d_d, string fi, size_t* dims, double* ebs);
-template void cusz::workflow::DryRun<long long>(long long* d, long long* d_d, string fi, size_t* dims, double* ebs);
+template void cusz::interface::DryRun<double>(double* d, double* d_d, string fi, size_t* dims, double* ebs);
+template void cusz::interface::DryRun<char>(char* d, char* d_d, string fi, size_t* dims, double* ebs);
+template void cusz::interface::DryRun<short>(short* d, short* d_d, string fi, size_t* dims, double* ebs);
+template void cusz::interface::DryRun<int>(int* d, int* d_d, string fi, size_t* dims, double* ebs);
+template void cusz::interface::DryRun<long>(long* d, long* d_d, string fi, size_t* dims, double* ebs);
+template void cusz::interface::DryRun<long long>(long long* d, long long* d_d, string fi, size_t* dims, double* ebs);
  */

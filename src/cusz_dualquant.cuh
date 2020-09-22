@@ -3,7 +3,7 @@
  * @author Jiannan Tian
  * @brief Dual-Quantization method of cuSZ (header).
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on 19-09-23
  *
  * @copyright (C) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
@@ -22,7 +22,7 @@ extern __shared__ char scratch[];
 // extern __shared__ float s3df[][8+ 1][8+ 1];
 
 namespace cusz {
-namespace PdQ {
+namespace predictor_quantizer {
 
 template <typename Data, typename Quant, int B = 32>
 __global__ void c_lorenzo_1d1l(Data* d, Quant* q, size_t const* dims, double const* precisions);
@@ -33,15 +33,11 @@ __global__ void c_lorenzo_2d1l(Data* d, Quant* q, size_t const* dims, double con
 template <typename Data, typename Quant, int B = 8>
 __global__ void c_lorenzo_3d1l(Data* d, Quant* q, size_t const* dims, double const* precisions);
 
-// use const memory
-template <typename Data, typename Quant, int B = 32>
-__global__ void c_lorenzo_1d1l_cmem(Data* d, Quant* q);
-
 template <typename Data, typename Quant, int B = 16>
-__global__ void c_lorenzo_2d1l_cmem(Data* d, Quant* q);
+__global__ void c_lorenzo_2d1l_virtual_padding(Data* d, Quant* q, size_t const* dims, double const* precisions);
 
 template <typename Data, typename Quant, int B = 8>
-__global__ void c_lorenzo_3d1l_cmem(Data* d, Quant* q);
+__global__ void c_lorenzo_3d1l_virtual_padding(Data* d, Quant* q, size_t const* dims, double const* precisions);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //   ^                 decompression |
@@ -57,7 +53,7 @@ __global__ void x_lorenzo_2d1l(Data* xd, Data* outlier, Quant* q, size_t const* 
 template <typename Data, typename Quant, int B = 8>
 __global__ void x_lorenzo_3d1l(Data* xd, Data* outlier, Quant* q, size_t const* dims, double val_2eb);
 
-}  // namespace PdQ
+}  // namespace predictor_quantizer
 }  // namespace cusz
 
 #endif
