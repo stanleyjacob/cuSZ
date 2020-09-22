@@ -24,7 +24,7 @@ const static unsigned int WARP_SIZE = 32;
 
 // Optimized 2013
 /* Copied from J. Gomez-Luna et al */
-template <typename T, typename Q>
-__global__ void p2013Histogram(T* input_data, Q* output, size_t N, int bins, int R);
+template <typename UInt1, typename UInt2>
+__global__ void p2013Histogram(UInt1* input_data, UInt2* output, size_t N, int bins, int R);
 
 #endif

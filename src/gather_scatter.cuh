@@ -20,20 +20,13 @@
 namespace cusz {
 namespace impl {
 
-template <typename DType>
-void GatherAsCSR(DType* d_A, size_t lenA, size_t ldA, size_t m, size_t n, int* nnz, std::string* fo);
+template <typename FP>
+void GatherAsCSR(FP*, size_t, size_t, size_t, size_t, int*, std::string*);
 
-template <typename DType>
-void ScatterFromCSR(DType* d_A, size_t lenA, size_t ldA, size_t m, size_t n, int* nnz, std::string* fi);
+template <typename FP>
+void ScatterFromCSR(FP*, size_t, size_t, size_t, size_t, int*, std::string*);
 
-void PruneGatherAsCSR(
-    float*       d_A,  //
-    size_t       len,
-    const int    lda,
-    const int    m,
-    const int    n,
-    int&         nnzC,
-    std::string* fo);
+void PruneGatherAsCSR(float*, size_t, const int, const int, const int, int&, std::string*);
 
 }  // namespace impl
 }  // namespace cusz

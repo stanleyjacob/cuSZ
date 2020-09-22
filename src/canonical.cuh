@@ -20,8 +20,8 @@ namespace GPU {
 
 __device__ int max_bw;
 
-template <typename T, typename K>
-__global__ void GetCanonicalCode(uint8_t* singleton, int DICT_SIZE);
+template <typename UInt, typename Huff>
+__global__ void GetCanonicalCode(uint8_t*, int);
 
 }  // namespace GPU
 #endif

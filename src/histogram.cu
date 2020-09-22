@@ -39,8 +39,8 @@ __global__ void naiveHistogram(int input_data[], int output[], int N, int symbol
 
 #define MIN(a, b) ((a) < (b)) ? (a) : (b)
 
-template <typename T, typename Q>
-__global__ void p2013Histogram(T* input_data, Q* output, size_t N, int bins, int R)
+template <typename UInt1, typename UInt2>
+__global__ void p2013Histogram(UInt1* input_data, UInt2* output, size_t N, int bins, int R)
 {
     extern __shared__ int Hs[/*(bins + 1) * R*/];
 

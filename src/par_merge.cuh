@@ -38,7 +38,7 @@
 
 /**
  * @file par_merge.cu
- * @author Oded Green (ogreen@gatech.edu), Rob McColl (robert.c.mccoll@gmail.com))
+ * @author Oded Green (ogreen@gatech.edu), Rob McColl (robert.c.mccoll@gmail.com)
  * @brief Modified and adapted by Cody Rivera
  * @version 0.1
  * @date 2020-09-20

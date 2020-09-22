@@ -19,18 +19,18 @@
 
 using uint8__t = uint8_t;
 
-template <typename Q, typename H>
-__global__ void EncodeFixedLen(Q* data, H* hcoded, size_t data_len, H* codebook)
+template <typename Quant, typename Huff>
+__global__ void EncodeFixedLen(Quant* q, Huff* h, size_t data_len, Huff* codebook)
 {
     size_t gid = blockDim.x * blockIdx.x + threadIdx.x;
     if (gid >= data_len) return;
-    hcoded[gid] = codebook[data[gid]];  // try to exploit cache?
+    h[gid] = codebook[q[gid]];  // try to exploit cache?
     __syncthreads();
 }
 
-template <typename Q>
+template <typename Huff>
 __global__ void Deflate(
-    Q*      hcoded,  //
+    Huff*   h,  //
     size_t  len,
     size_t* densely_meta,
     int     PART_SIZE)
@@ -38,22 +38,22 @@ __global__ void Deflate(
     size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
     if (gid >= (len - 1) / PART_SIZE + 1) return;
     uint8_t bitwidth;
-    size_t  densely_coded_lsb_pos = sizeof(Q) * 8, total_bitwidth = 0;
+    size_t  densely_coded_lsb_pos = sizeof(Huff) * 8, total_bitwidth = 0;
     size_t  ending = (gid + 1) * PART_SIZE <= len ? PART_SIZE : len - gid * PART_SIZE;
     //    if ((gid + 1) * PART_SIZE > len) printf("\n\ngid %lu\tending %lu\n\n", gid, ending);
-    Q  msb_bw_word_lsb, _1, _2;
-    Q* current = hcoded + gid * PART_SIZE;
+    Huff  msb_bw_word_lsb, _1, _2;
+    Huff* current = h + gid * PART_SIZE;
     for (size_t i = 0; i < ending; i++) {
-        msb_bw_word_lsb = hcoded[gid * PART_SIZE + i];
-        bitwidth        = *((uint8_t*)&msb_bw_word_lsb + (sizeof(Q) - 1));
+        msb_bw_word_lsb = h[gid * PART_SIZE + i];
+        bitwidth        = *((uint8_t*)&msb_bw_word_lsb + (sizeof(Huff) - 1));
 
-        *((uint8_t*)&msb_bw_word_lsb + sizeof(Q) - 1) = 0x0;
-        if (densely_coded_lsb_pos == sizeof(Q) * 8) *current = 0x0;  // a new unit of data type
+        *((uint8_t*)&msb_bw_word_lsb + sizeof(Huff) - 1) = 0x0;
+        if (densely_coded_lsb_pos == sizeof(Huff) * 8) *current = 0x0;  // a new unit of data type
         if (bitwidth <= densely_coded_lsb_pos) {
             densely_coded_lsb_pos -= bitwidth;
             *current |= msb_bw_word_lsb << densely_coded_lsb_pos;
             if (densely_coded_lsb_pos == 0) {
-                densely_coded_lsb_pos = sizeof(Q) * 8;
+                densely_coded_lsb_pos = sizeof(Huff) * 8;
                 ++current;
             }
         }
@@ -63,56 +63,56 @@ __global__ void Deflate(
             // and put last 2 bits from MSB of (*(++current))
             // the comment continues with the example
             _1 = msb_bw_word_lsb >> (bitwidth - densely_coded_lsb_pos);
-            _2 = msb_bw_word_lsb << (sizeof(Q) * 8 - (bitwidth - densely_coded_lsb_pos));
+            _2 = msb_bw_word_lsb << (sizeof(Huff) * 8 - (bitwidth - densely_coded_lsb_pos));
             *current |= _1;
             *(++current) = 0x0;
             *current |= _2;
-            densely_coded_lsb_pos = sizeof(Q) * 8 - (bitwidth - densely_coded_lsb_pos);
+            densely_coded_lsb_pos = sizeof(Huff) * 8 - (bitwidth - densely_coded_lsb_pos);
         }
         total_bitwidth += bitwidth;
     }
     *(densely_meta + gid) = total_bitwidth;
 }
 
-template <typename H, typename T>
-__device__ void InflateChunkwise(H* in_huff, T* out_quant, size_t total_bw, uint8_t* singleton)
+template <typename Huff, typename Quant>
+__device__ void InflateChunkwise(Huff* in_h, Quant* out_q, size_t total_bw, uint8_t* singleton)
 {
     uint8_t next_bit;
     size_t  idx_bit;
     size_t  idx_byte   = 0;
     size_t  idx_bcoded = 0;
-    auto    first      = reinterpret_cast<H*>(singleton);
-    auto    entry      = first + sizeof(H) * 8;
-    auto    keys       = reinterpret_cast<T*>(singleton + sizeof(H) * (2 * sizeof(H) * 8));
-    H       v          = (in_huff[idx_byte] >> (sizeof(H) * 8 - 1)) & 0x1;  // get the first bit
+    auto    first      = reinterpret_cast<Huff*>(singleton);
+    auto    entry      = first + sizeof(Huff) * 8;
+    auto    keys       = reinterpret_cast<Quant*>(singleton + sizeof(Huff) * (2 * sizeof(Huff) * 8));
+    Huff    v          = (in_h[idx_byte] >> (sizeof(Huff) * 8 - 1)) & 0x1;  // get the first bit
     size_t  l          = 1;
     size_t  i          = 0;
     while (i < total_bw) {
         while (v < first[l]) {  // append next i_cb bit
             ++i;
-            idx_byte = i / (sizeof(H) * 8);
-            idx_bit  = i % (sizeof(H) * 8);
-            next_bit = ((in_huff[idx_byte] >> (sizeof(H) * 8 - 1 - idx_bit)) & 0x1);
+            idx_byte = i / (sizeof(Huff) * 8);
+            idx_bit  = i % (sizeof(Huff) * 8);
+            next_bit = ((in_h[idx_byte] >> (sizeof(Huff) * 8 - 1 - idx_bit)) & 0x1);
             v        = (v << 1) | next_bit;
             ++l;
         }
-        out_quant[idx_bcoded++] = keys[entry[l] + v - first[l]];
+        out_q[idx_bcoded++] = keys[entry[l] + v - first[l]];
         {
             ++i;
-            idx_byte = i / (sizeof(H) * 8);
-            idx_bit  = i % (sizeof(H) * 8);
-            next_bit = ((in_huff[idx_byte] >> (sizeof(H) * 8 - 1 - idx_bit)) & 0x1);
+            idx_byte = i / (sizeof(Huff) * 8);
+            idx_bit  = i % (sizeof(Huff) * 8);
+            next_bit = ((in_h[idx_byte] >> (sizeof(Huff) * 8 - 1 - idx_bit)) & 0x1);
             v        = 0x0 | next_bit;
         }
         l = 1;
     }
 }
 
-template <typename Q, typename H>
+template <typename Quant, typename Huff>
 __global__ void Decode(
-    H*       densely,     //
+    Huff*    h,           //
     size_t*  dH_meta,     //
-    Q*       bcode,       //
+    Quant*   q,           //
     size_t   len,         //
     int      chunk_size,  //
     int      n_chunk,
@@ -130,10 +130,10 @@ __global__ void Decode(
     // if (chunk_id == 0) printf("n_chunk: %lu\n", n_chunk);
     if (chunk_id >= n_chunk) return;
 
-    InflateChunkwise(                       //
-        densely + dH_uInt_entry[chunk_id],  //
-        bcode + chunk_size * chunk_id,      //
-        dH_bit_meta[chunk_id],              //
+    InflateChunkwise(                 //
+        h + dH_uInt_entry[chunk_id],  //
+        q + chunk_size * chunk_id,    //
+        dH_bit_meta[chunk_id],        //
         _s_singleton);
     __syncthreads();
 };

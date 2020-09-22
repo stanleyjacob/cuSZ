@@ -18,15 +18,15 @@
 using std::cout;
 using std::endl;
 
-template <typename T, int DS, int tBLK>
-__global__ void Prototype::binning2d(T* input, T* output, size_t d0, size_t d1, size_t new_d0, size_t new_d1)
+template <typename Data, int DS, int tBLK>
+__global__ void Prototype::binning2d(Data* input, Data* output, size_t d0, size_t d1, size_t new_d0, size_t new_d1)
 {
     auto y   = threadIdx.y;
     auto x   = threadIdx.x;
     auto yid = blockIdx.y * blockDim.y + y;
     auto xid = blockIdx.x * blockDim.x + x;
 
-    __shared__ T s[tBLK][tBLK];
+    __shared__ Data s[tBLK][tBLK];
 
     if (yid >= new_d1 or xid >= new_d0) return;
 
@@ -37,7 +37,7 @@ __global__ void Prototype::binning2d(T* input, T* output, size_t d0, size_t d1, 
     for (int j = 0; j < yblk; j++)
         for (int i = 0; i < xblk; i++) s[y][x] += input[(yid * DS + j) * d0 + (xid * DS + i)];
 
-    output[yid * new_d0 + xid] = s[y][x] / static_cast<T>(yblk * xblk);
+    output[yid * new_d0 + xid] = s[y][x] / static_cast<Data>(yblk * xblk);
 }
 
 template __global__ void Prototype::binning2d<float, 2, 32>(float*, float*, size_t, size_t, size_t, size_t);

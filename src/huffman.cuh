@@ -6,6 +6,8 @@
  *  Created on Aug., 2016
  *  @brief Customized Huffman Encoding, Compression and Decompression functions.
  *         Also modified for GPU prototyping (header).
+ *  @deprecated Serial Huffman build on GPU has be substituted with par-Huffman.
+ *
  *  (C) 2016 by Mathematics and Computer Science (MCS), Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
  */

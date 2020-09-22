@@ -47,16 +47,16 @@ const int B_1d = 32;
 const int B_2d = 16;
 const int B_3d = 8;
 
-template <typename T>
-__global__ void cusz::dryrun::lorenzo_1d1l(T* data, size_t* dims_L16, double* ebs_L4)
+template <typename Data>
+__global__ void cusz::dryrun::lorenzo_1d1l(Data* data, size_t* dims_L16, double* ebs_L4)
 {
     auto id = blockIdx.x * blockDim.x + threadIdx.x;
     if (id >= dims_L16[DIM0]) return;
     data[id] = round(data[id] * ebs_L4[EBx2_r]) * ebs_L4[EBx2];  // prequantization
 }
 
-template <typename T>
-__global__ void cusz::dryrun::lorenzo_2d1l(T* data, size_t* dims_L16, double* ebs_L4)
+template <typename Data>
+__global__ void cusz::dryrun::lorenzo_2d1l(Data* data, size_t* dims_L16, double* ebs_L4)
 {
     auto   y   = threadIdx.y;
     auto   x   = threadIdx.x;
@@ -67,8 +67,8 @@ __global__ void cusz::dryrun::lorenzo_2d1l(T* data, size_t* dims_L16, double* eb
     data[id] = round(data[id] * ebs_L4[EBx2_r]) * ebs_L4[EBx2];  // prequantization
 }
 
-template <typename T>
-__global__ void cusz::dryrun::lorenzo_3d1l(T* data, size_t* dims_L16, double* ebs_L4)
+template <typename Data>
+__global__ void cusz::dryrun::lorenzo_3d1l(Data* data, size_t* dims_L16, double* ebs_L4)
 {
     auto   gi2 = blockIdx.z * blockDim.z + threadIdx.z;
     auto   gi1 = blockIdx.y * blockDim.y + threadIdx.y;
@@ -79,8 +79,8 @@ __global__ void cusz::dryrun::lorenzo_3d1l(T* data, size_t* dims_L16, double* eb
     data[id] = round(data[id] * ebs_L4[EBx2_r]) * ebs_L4[EBx2];  // prequantization
 }
 
-template <typename T>
-void cusz::workflow::DryRun(T* d, T* d_d, string fi, size_t* dims, double* ebs)
+template <typename Data>
+void cusz::workflow::DryRun(Data* d, Data* d_d, string fi, size_t* dims, double* ebs)
 {
     cout << log_info << "Entering dry-run mode..." << endl;
     auto len        = dims[LEN];
@@ -90,24 +90,24 @@ void cusz::workflow::DryRun(T* d, T* d_d, string fi, size_t* dims, double* ebs)
     if (dims[nDIM] == 1) {
         dim3 blockNum(dims[nBLK0]);
         dim3 threadNum(B_1d);
-        cusz::dryrun::lorenzo_1d1l<T><<<blockNum, threadNum>>>(d_d, d_dims_L16, d_ebs_L4);
+        cusz::dryrun::lorenzo_1d1l<Data><<<blockNum, threadNum>>>(d_d, d_dims_L16, d_ebs_L4);
     }
     else if (dims[nDIM] == 2) {
         dim3 blockNum(dims[nBLK0], dims[nBLK1]);
         dim3 threadNum(B_2d, B_2d);
-        cusz::dryrun::lorenzo_2d1l<T><<<blockNum, threadNum>>>(d_d, d_dims_L16, d_ebs_L4);
+        cusz::dryrun::lorenzo_2d1l<Data><<<blockNum, threadNum>>>(d_d, d_dims_L16, d_ebs_L4);
     }
     else if (dims[nDIM] == 3) {
         dim3 blockNum(dims[nBLK0], dims[nBLK1], dims[nBLK2]);
         dim3 threadNum(B_3d, B_3d, B_3d);
-        cusz::dryrun::lorenzo_3d1l<T><<<blockNum, threadNum>>>(d_d, d_dims_L16, d_ebs_L4);
+        cusz::dryrun::lorenzo_3d1l<Data><<<blockNum, threadNum>>>(d_d, d_dims_L16, d_ebs_L4);
     }
     cudaDeviceSynchronize();
-    cudaMemcpy(d, d_d, len * sizeof(T), cudaMemcpyDeviceToHost);
+    cudaMemcpy(d, d_d, len * sizeof(Data), cudaMemcpyDeviceToHost);
 
-    auto d2 = io::ReadBinaryFile<T>(fi, len);
+    auto d2 = io::ReadBinaryFile<Data>(fi, len);
     // CR is not valid in dry run
-    analysis::VerifyData<T>(d, d2, len, false, ebs[EB], 0);
+    analysis::VerifyData<Data>(d, d2, len, false, ebs[EB], 0);
     cout << log_info << "Dry-run finished, exit..." << endl;
     delete[] d;
     delete[] d2;

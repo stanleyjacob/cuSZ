@@ -21,8 +21,8 @@ using std::endl;
 
 namespace Prototype {
 
-template <typename T, int DS, int tBLK>
-__global__ void binning2d(T* input, T* output, size_t d0, size_t d1, size_t new_d0, size_t new_d1);
+template <typename Data, int DS, int tBLK>
+__global__ void binning2d(Data* input, Data* output, size_t d0, size_t d1, size_t new_d0, size_t new_d1);
 
 }  // namespace Prototype
 

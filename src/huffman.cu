@@ -6,6 +6,8 @@
  *  Created on Aug., 2016
  *  @brief Customized Huffman Encoding, Compression and Decompression functions.
  *         Also modified for GPU prototyping.
+ *  @deprecated Serial Huffman build on GPU has be substituted with par-Huffman.
+ &
  *  (C) 2016 by Mathematics and Computer Science (MCS), Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
  */
@@ -176,10 +178,7 @@ __host__ __device__ void build_code(HuffmanTree* ht, node_list n, int len, uint6
 // internal functions
 ////////////////////////////////////////////////////////////////////////////////
 
-__device__ __forceinline__ node_list top(internal_stack_t* s)
-{
-    return s->_a[s->depth - 1];
-}
+__device__ __forceinline__ node_list top(internal_stack_t* s) { return s->_a[s->depth - 1]; }
 
 template <typename T>
 __device__ __forceinline__ void push_v2(internal_stack_t* s, node_list n, T path, T len)
@@ -195,10 +194,7 @@ __device__ __forceinline__ void push_v2(internal_stack_t* s, node_list n, T path
         printf("Error: stack overflow\n");
 }
 
-__device__ __forceinline__ bool isEmpty(internal_stack_t* s)
-{
-    return (s->depth == 0);
-}
+__device__ __forceinline__ bool isEmpty(internal_stack_t* s) { return (s->depth == 0); }
 
 // TODO check with typing
 template <typename T>
