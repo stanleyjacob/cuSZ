@@ -33,7 +33,6 @@
 #include "dbg_gpu_printing.cuh"
 #include "format.hh"
 #include "histogram.cuh"
-#include "huffman.cuh"
 #include "huffman_codec.cuh"
 #include "huffman_workflow.cuh"
 #include "par_huffman.cuh"
@@ -307,4 +306,3 @@ template uint32_t* lossless::interface::HuffmanDecode<uint32_t, uint32_t, float>
 template uint8__t* lossless::interface::HuffmanDecode<uint8__t, uint64_t, float>(std::string&, size_t, int, int, int);
 template uint16_t* lossless::interface::HuffmanDecode<uint16_t, uint64_t, float>(std::string&, size_t, int, int, int);
 template uint32_t* lossless::interface::HuffmanDecode<uint32_t, uint64_t, float>(std::string&, size_t, int, int, int);
-// clang-format off
