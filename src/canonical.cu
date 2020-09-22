@@ -13,7 +13,6 @@
  *
  */
 
-#include <bits/stdint-uintn.h>
 #include <cooperative_groups.h>
 #include <stddef.h>
 #include <stdint.h>

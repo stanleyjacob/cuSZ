@@ -21,7 +21,7 @@ const string huff_re_build_str   = "((pre-release)) build 2009.22.1";
 const string huff_re_version     = "2009.22.1";
 const string huff_re_cusz_compat = "0";
 
-const string cusz_short_doc(
+extern const string cusz_short_doc =
     "\n"
     "OVERVIEW: cuSZ: An Efficient GPU-Based Error-Bounded Lossy Compression Framework for Scientific Data\n"
     "\n"
@@ -52,9 +52,9 @@ const string cusz_short_doc(
     "huffman\n"
     "\n"
     "DOC:\n"
-    "  Type \"cusz -h\" for details.\n");
+    "  Type \"cusz -h\" for details.\n";
 
-const string cusz_full_doc(
+extern const string cusz_full_doc =
     "*NAME*\n"
     "        cuSZ: An Efficient GPU-Based Error-Bounded Lossy Compression Framework for Scientific Data\n"
     "        Lowercased \"*cusz*\" is the command."
@@ -150,9 +150,9 @@ const string cusz_full_doc(
     "        *EXAFEL* example:\n"
     "        ./bin/cusz -f32 -m r2r -e 1e-4 -i ./data/sample-exafel-59200x388 -D exafeldemo -z -x --pre binning\n"
     "        ./bin/cusz -f32 -m r2r -e 1e-4 -i ./data/sample-exafel-59200x388 -D exafeldemo -z -x --pre binning "
-    "--skip huffman\n");
+    "--skip huffman\n";
 
-const string huff_re_short_doc(
+extern const string huff_re_short_doc =
     "\n"
     "OVERVIEW: Huffman submodule as standalone program\n"  // TODO from this line on
     "\n"
@@ -171,4 +171,20 @@ const string huff_re_short_doc(
     "    ./bin/huff -e -d -i ./baryon_density.dat.b16 -3 512 512 512 -R 16 -c 1024\n"
     "    have to input dimension, and higher dimension for a multiplication of each dim.,\n"
     "    as default values input-rep=16 (bits), huff-rep=32 (bits), codebokk-size=1024 (symbols)\n"
-    "\n");
+    "\n";
+
+extern const string doc_dim_order =
+    "\n"
+    "    |<--------------------------- 3600 --------------------------->|    \n"
+    "    +--------------------------------------------------------------+  - \n"
+    "    |                                                              |  ^ \n"
+    "    |                                                              |  | \n"
+    "    |            CESM-ATM:    1800x3600 (y-x order)                |  | \n"
+    "    |            datum name:  <field>_1800_3600                    |  | \n"
+    "    |                                                              | 1800 \n"
+    "    |            input:       -2 3600 1800                         |  | \n"
+    "    |            input order: -2 [x] [y]                           |  | \n"
+    "    |                                                              |  | \n"
+    "    |                                                              |  v \n"
+    "    +--------------------------------------------------------------+  - \n"
+    "\n";

@@ -27,4 +27,6 @@ extern const string huff_re_build_str;
 extern const string huff_re_version;
 extern const string huff_re_cusz_compat;
 
+extern const string doc_dim_order;
+
 #endif

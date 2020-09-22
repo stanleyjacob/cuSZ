@@ -14,7 +14,8 @@ BIN_DIR   := bin
 
 GPU_VOLTA := -gencode=arch=compute_70,code=sm_70
 GPU_TURING:= -gencode=arch=compute_75,code=sm_75
-GPU_AMPERE:= -gencode=arch=compute_80,code=sm_80
+GPU_AMPERE_A100:= -gencode=arch=compute_80,code=sm_80
+GPU_AMPERE_RTX := -gencode=arch=compute_86,code=sm_86
 DEPLOY    := $(GPU_VOLTA)
 
 CUDA_MAJV := $(shell nvcc --version | grep "release" | \
@@ -25,7 +26,9 @@ ifeq ($(shell test $(CUDA_MAJV) -ge 10; echo $$?), 0)
 endif
 
 ifeq ($(shell test $(CUDA_MAJV) -ge 11; echo $$?), 0)
-  DEPLOY += $(GPU_AMPERE)
+#  temporarily comment out before new GPUs arrive
+#  DEPLOY += $(GPU_AMPERE_A100)
+#  DEPLOY += $(GPU_AMPERE_RTX)
 endif
 
 CCFLAGS   := $(STD) -O3
