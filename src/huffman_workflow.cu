@@ -3,7 +3,7 @@
  * @author Jiannan Tian, Cody Rivera (cjrivera1@crimson.ua.edu)
  * @brief Workflow of Huffman coding.
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on 2020-04-24
  *
  * @copyright Copyright (c) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
@@ -27,7 +27,6 @@
 #include <type_traits>
 #include <vector>
 
-#include "canonical.cuh"
 #include "cuda_error_handling.cuh"
 #include "cuda_mem.cuh"
 #include "dbg_gpu_printing.cuh"
@@ -44,7 +43,7 @@ int ht_all_nodes;
 using uint8__t = uint8_t;
 
 template <typename UInt>
-void wrapper::GetFrequency(UInt* d_data, size_t len, unsigned int* d_freq, int num_bins)
+void lossless::wrap::GetFrequency(UInt* d_data, size_t len, unsigned int* d_freq, int num_bins)
 {
     // Parameters for thread and block count optimization
 
@@ -63,7 +62,9 @@ void wrapper::GetFrequency(UInt* d_data, size_t len, unsigned int* d_freq, int n
     int itemsPerThread = 1;
     int RPerBlock      = (maxbytes / (int)sizeof(int)) / (numBuckets + 1);
     int numBlocks      = numSMs;
-    cudaFuncSetAttribute(p2013Histogram<UInt, unsigned int>, cudaFuncAttributeMaxDynamicSharedMemorySize, maxbytes);
+    cudaFuncSetAttribute(
+        data_process::reduce::p2013Histogram<UInt, unsigned int>, cudaFuncAttributeMaxDynamicSharedMemorySize,
+        maxbytes);
     // fits to size
     int threadsPerBlock = ((((numValues / (numBlocks * itemsPerThread)) + 1) / 64) + 1) * 64;
     while (threadsPerBlock > 1024) {
@@ -74,7 +75,7 @@ void wrapper::GetFrequency(UInt* d_data, size_t len, unsigned int* d_freq, int n
             threadsPerBlock = ((((numValues / (numBlocks * itemsPerThread)) + 1) / 64) + 1) * 64;
         }
     }
-    p2013Histogram                                                                      //
+    data_process::reduce::p2013Histogram                                                //
         <<<numBlocks, threadsPerBlock, ((numBuckets + 1) * RPerBlock) * sizeof(int)>>>  //
         (d_data, d_freq, numValues, numBuckets, RPerBlock);
     cudaDeviceSynchronize();
@@ -99,7 +100,7 @@ void wrapper::GetFrequency(UInt* d_data, size_t len, unsigned int* d_freq, int n
 }
 
 template <typename Huff>
-void PrintChunkHuffmanCoding(
+void lossless::util::PrintChunkHuffmanCoding(
     size_t* dH_bit_meta,  //
     size_t* dH_uInt_meta,
     size_t  len,
@@ -123,13 +124,14 @@ void PrintChunkHuffmanCoding(
 }
 
 template <typename Quant, typename Huff, typename DATA>
-std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Quant* d_in, size_t len, int chunk_size, int cb_size)
+std::tuple<size_t, size_t, size_t>
+lossless::interface::HuffmanEncode(string& f_in, Quant* d_in, size_t len, int chunk_size, int cb_size)
 {
     // histogram
     ht_state_num = 2 * cb_size;
     ht_all_nodes = 2 * ht_state_num;
     auto d_freq  = mem::CreateCUDASpace<unsigned int>(ht_all_nodes);
-    wrapper::GetFrequency(d_in, len, d_freq, cb_size);
+    lossless::wrap::GetFrequency(d_in, len, d_freq, cb_size);
 
     // Allocate cb memory
     auto d_canon_cb = mem::CreateCUDASpace<Huff>(cb_size, 0xff);  // canonical codebook
@@ -141,7 +143,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Quant* d_in, size
     auto d_decode_meta    = mem::CreateCUDASpace<uint8_t>(decode_meta_size);
 
     // Get codebooks
-    ParGetCodebook<Quant, Huff>(cb_size, d_freq, d_canon_cb, d_decode_meta);
+    lossless::par_huffman::ParGetCodebook<Quant, Huff>(cb_size, d_freq, d_canon_cb, d_decode_meta);
     cudaDeviceSynchronize();
 
     auto decode_meta = mem::CreateHostSpaceAndMemcpyFromDevice(d_decode_meta, decode_meta_size);
@@ -159,7 +161,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Quant* d_in, size
     {
         auto block_dim = tBLK_ENCODE;
         auto grid_dim  = (len - 1) / block_dim + 1;
-        EncodeFixedLen<Quant, Huff><<<grid_dim, block_dim>>>(d_in, d_h, len, d_canon_cb);
+        lossless::wrap::EncodeFixedLen<Quant, Huff><<<grid_dim, block_dim>>>(d_in, d_h, len, d_canon_cb);
         cudaDeviceSynchronize();
     }
 
@@ -171,7 +173,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Quant* d_in, size
     {
         auto block_dim = tBLK_DEFLATE;
         auto grid_dim  = (n_chunk - 1) / block_dim + 1;
-        Deflate<Huff><<<grid_dim, block_dim>>>(d_h, len, d_h_bitwidths, chunk_size);
+        lossless::wrap::Deflate<Huff><<<grid_dim, block_dim>>>(d_h, len, d_h_bitwidths, chunk_size);
         cudaDeviceSynchronize();
     }
 
@@ -199,7 +201,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Quant* d_in, size
         sizeof(Huff) * 8, total_bits);
 
     // print densely metadata
-    PrintChunkHuffmanCoding<Huff>(dH_bit_meta, dH_uInt_meta, len, chunk_size, total_bits, total_uInts);
+    lossless::util::PrintChunkHuffmanCoding<Huff>(dH_bit_meta, dH_uInt_meta, len, chunk_size, total_bits, total_uInts);
 
     // copy back densely Huffman code in units of uInt (regarding endianness)
     auto h = new Huff[total_uInts]();
@@ -218,7 +220,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Quant* d_in, size
     io::WriteBinaryFile(                                         //
         reinterpret_cast<uint8_t*>(decode_meta),                 //
         sizeof(Huff) * (2 * type_bw) + sizeof(Quant) * cb_size,  // first, entry, reversed dict (keys)
-        new string(f_in + ".cHcb"));
+        new string(f_in + ".canon"));
 
     size_t metadata_size = (2 * n_chunk) * sizeof(decltype(h_meta))                   //
                            + sizeof(Huff) * (2 * type_bw) + sizeof(Quant) * cb_size;  // uint8_t
@@ -237,65 +239,65 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Quant* d_in, size
     return std::make_tuple(total_bits, total_uInts, metadata_size);
 }
 
-template <typename Q, typename H, typename DATA>
-Q* HuffmanDecode(
+template <typename Quant, typename Huff, typename DATA>
+Quant* lossless::interface::HuffmanDecode(
     std::string& f_bcode_base,  //
     size_t       len,
     int          chunk_size,
     int          total_uInts,
     int          dict_size)
 {
-    auto type_bw             = sizeof(H) * 8;
-    auto canonical_meta      = sizeof(H) * (2 * type_bw) + sizeof(Q) * dict_size;
-    auto canonical_singleton = io::ReadBinaryFile<uint8_t>(f_bcode_base + ".cHcb", canonical_meta);
+    auto type_bw         = sizeof(Huff) * 8;
+    auto canon_meta      = sizeof(Huff) * (2 * type_bw) + sizeof(Quant) * dict_size;
+    auto canon_singleton = io::ReadBinaryFile<uint8_t>(f_bcode_base + ".canon", canon_meta);
     cudaDeviceSynchronize();
 
     auto n_chunk   = (len - 1) / chunk_size + 1;
-    auto hcode     = io::ReadBinaryFile<H>(f_bcode_base + ".dh", total_uInts);
+    auto hcode     = io::ReadBinaryFile<Huff>(f_bcode_base + ".dh", total_uInts);
     auto dH_meta   = io::ReadBinaryFile<size_t>(f_bcode_base + ".hmeta", 2 * n_chunk);
     auto block_dim = tBLK_DEFLATE;  // the same as deflating
     auto grid_dim  = (n_chunk - 1) / block_dim + 1;
 
-    auto d_xbcode              = mem::CreateCUDASpace<Q>(len);
-    auto d_dHcode              = mem::CreateDeviceSpaceAndMemcpyFromHost(hcode, total_uInts);
-    auto d_hcode_meta          = mem::CreateDeviceSpaceAndMemcpyFromHost(dH_meta, 2 * n_chunk);
-    auto d_canonical_singleton = mem::CreateDeviceSpaceAndMemcpyFromHost(canonical_singleton, canonical_meta);
+    auto d_xbcode          = mem::CreateCUDASpace<Quant>(len);
+    auto d_dHcode          = mem::CreateDeviceSpaceAndMemcpyFromHost(hcode, total_uInts);
+    auto d_hcode_meta      = mem::CreateDeviceSpaceAndMemcpyFromHost(dH_meta, 2 * n_chunk);
+    auto d_canon_singleton = mem::CreateDeviceSpaceAndMemcpyFromHost(canon_singleton, canon_meta);
     cudaDeviceSynchronize();
 
-    Decode<<<grid_dim, block_dim, canonical_meta>>>(  //
-        d_dHcode, d_hcode_meta, d_xbcode, len, chunk_size, n_chunk, d_canonical_singleton, (size_t)canonical_meta);
+    lossless::wrap::Decode<<<grid_dim, block_dim, canon_meta>>>(  //
+        d_dHcode, d_hcode_meta, d_xbcode, len, chunk_size, n_chunk, d_canon_singleton, (size_t)canon_meta);
     cudaDeviceSynchronize();
 
     auto xbcode = mem::CreateHostSpaceAndMemcpyFromDevice(d_xbcode, len);
     cudaFree(d_xbcode);
     cudaFree(d_dHcode);
     cudaFree(d_hcode_meta);
-    cudaFree(d_canonical_singleton);
+    cudaFree(d_canon_singleton);
     delete[] hcode;
     delete[] dH_meta;
-    delete[] canonical_singleton;
+    delete[] canon_singleton;
 
     return xbcode;
 }
 
-template void wrapper::GetFrequency<uint8__t>(uint8__t*, size_t, unsigned int*, int);
-template void wrapper::GetFrequency<uint16_t>(uint16_t*, size_t, unsigned int*, int);
-template void wrapper::GetFrequency<uint32_t>(uint32_t*, size_t, unsigned int*, int);
+template void lossless::wrap::GetFrequency<uint8__t>(uint8__t*, size_t, unsigned int*, int);
+template void lossless::wrap::GetFrequency<uint16_t>(uint16_t*, size_t, unsigned int*, int);
+template void lossless::wrap::GetFrequency<uint32_t>(uint32_t*, size_t, unsigned int*, int);
 
-template void PrintChunkHuffmanCoding<uint32_t>(size_t*, size_t*, size_t, int, size_t, size_t);
-template void PrintChunkHuffmanCoding<uint64_t>(size_t*, size_t*, size_t, int, size_t, size_t);
+template void lossless::util::PrintChunkHuffmanCoding<uint32_t>(size_t*, size_t*, size_t, int, size_t, size_t);
+template void lossless::util::PrintChunkHuffmanCoding<uint64_t>(size_t*, size_t*, size_t, int, size_t, size_t);
 
-template tuple3ul HuffmanEncode<uint8__t, uint32_t, float>(string&, uint8__t*, size_t, int, int);
-template tuple3ul HuffmanEncode<uint16_t, uint32_t, float>(string&, uint16_t*, size_t, int, int);
-template tuple3ul HuffmanEncode<uint32_t, uint32_t, float>(string&, uint32_t*, size_t, int, int);
-template tuple3ul HuffmanEncode<uint8__t, uint64_t, float>(string&, uint8__t*, size_t, int, int);
-template tuple3ul HuffmanEncode<uint16_t, uint64_t, float>(string&, uint16_t*, size_t, int, int);
-template tuple3ul HuffmanEncode<uint32_t, uint64_t, float>(string&, uint32_t*, size_t, int, int);
+template tuple3ul lossless::interface::HuffmanEncode<uint8__t, uint32_t, float>(string&, uint8__t*, size_t, int, int);
+template tuple3ul lossless::interface::HuffmanEncode<uint16_t, uint32_t, float>(string&, uint16_t*, size_t, int, int);
+template tuple3ul lossless::interface::HuffmanEncode<uint32_t, uint32_t, float>(string&, uint32_t*, size_t, int, int);
+template tuple3ul lossless::interface::HuffmanEncode<uint8__t, uint64_t, float>(string&, uint8__t*, size_t, int, int);
+template tuple3ul lossless::interface::HuffmanEncode<uint16_t, uint64_t, float>(string&, uint16_t*, size_t, int, int);
+template tuple3ul lossless::interface::HuffmanEncode<uint32_t, uint64_t, float>(string&, uint32_t*, size_t, int, int);
 
-template uint8__t* HuffmanDecode<uint8__t, uint32_t, float>(std::string&, size_t, int, int, int);
-template uint16_t* HuffmanDecode<uint16_t, uint32_t, float>(std::string&, size_t, int, int, int);
-template uint32_t* HuffmanDecode<uint32_t, uint32_t, float>(std::string&, size_t, int, int, int);
-template uint8__t* HuffmanDecode<uint8__t, uint64_t, float>(std::string&, size_t, int, int, int);
-template uint16_t* HuffmanDecode<uint16_t, uint64_t, float>(std::string&, size_t, int, int, int);
-template uint32_t* HuffmanDecode<uint32_t, uint64_t, float>(std::string&, size_t, int, int, int);
+template uint8__t* lossless::interface::HuffmanDecode<uint8__t, uint32_t, float>(std::string&, size_t, int, int, int);
+template uint16_t* lossless::interface::HuffmanDecode<uint16_t, uint32_t, float>(std::string&, size_t, int, int, int);
+template uint32_t* lossless::interface::HuffmanDecode<uint32_t, uint32_t, float>(std::string&, size_t, int, int, int);
+template uint8__t* lossless::interface::HuffmanDecode<uint8__t, uint64_t, float>(std::string&, size_t, int, int, int);
+template uint16_t* lossless::interface::HuffmanDecode<uint16_t, uint64_t, float>(std::string&, size_t, int, int, int);
+template uint32_t* lossless::interface::HuffmanDecode<uint32_t, uint64_t, float>(std::string&, size_t, int, int, int);
 // clang-format off

@@ -6,7 +6,7 @@
  * @author Jiannan Tian, Cody Rivera (cjrivera1@crimson.ua.edu)
  * @brief Workflow of Huffman coding (header).
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on 2020-04-24
  *
  * @copyright Copyright (c) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
@@ -34,26 +34,32 @@ const int tBLK_CANONICAL = 128;
 //    return (access(name.c_str(), F_OK) != -1);
 //}
 
-namespace wrapper {
+typedef std::tuple<size_t, size_t, size_t> tuple3ul;
 
-template <typename Q>
-void GetFrequency(Q* d_bcode, size_t len, unsigned int* d_freq, int dict_size);
+namespace lossless {
 
-template <typename H>
-void SetUpHuffmanTree(unsigned int* d_freq, H* d_codebook, int dict_size);
+namespace interface {
 
-template <typename Q, typename H>
-void MakeCanonical(H* d_plain_cb, uint8_t* d_singleton, size_t total_bytes, int dict_size);
+template <typename UInt, typename Huff, typename DATA = float>
+tuple3ul HuffmanEncode(string& f_in, UInt* d_in, size_t len, int chunk_size, int dict_size = 1024);
 
-template <typename Q, typename H>
-void EncodeByMemcpy(Q* d_bcode, size_t len, H* d_hcode, H* d_canonical_cb);
+template <typename UInt, typename Huff, typename DATA = float>
+UInt* HuffmanDecode(std::string& f_in_base, size_t len, int chunk_size, int total_uInts, int dict_size = 1024);
 
-template <typename H>
-void Deflate(H* d_hcode, size_t len, int chunk_size, int n_chunk, size_t* d_dH_bit_meta);
+}  // namespace interface
 
-}  // namespace wrapper
+namespace wrap {
 
-template <typename H>
+template <typename UInt>
+void GetFrequency(UInt*, size_t, unsigned int*, int);
+
+template <typename Huff>
+void Deflate(Huff*, size_t, int, int, size_t*);
+
+}  // namespace wrap
+
+namespace util {
+template <typename Huff>
 void PrintChunkHuffmanCoding(
     size_t* dH_bit_meta,
     size_t* dH_uInt_meta,
@@ -61,13 +67,8 @@ void PrintChunkHuffmanCoding(
     int     chunk_size,
     size_t  total_bits,
     size_t  total_uInts);
+}
 
-typedef std::tuple<size_t, size_t, size_t> tuple3ul;
-
-template <typename Q, typename H, typename DATA = float>
-tuple3ul HuffmanEncode(string& f_bcode, Q* d_bcode, size_t len, int chunk_size, int dict_size = 1024);
-
-template <typename Q, typename H, typename DATA = float>
-Q* HuffmanDecode(std::string& f_bcode_base, size_t len, int chunk_size, int total_uInts, int dict_size = 1024);
+}  // namespace lossless
 
 #endif

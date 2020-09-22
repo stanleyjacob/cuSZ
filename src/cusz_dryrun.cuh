@@ -3,7 +3,7 @@
  * @author Jiannan Tian
  * @brief cuSZ dryrun mode, checking data quality from lossy compression (header).
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on 2020-05-14
  *
  * @copyright Copyright (c) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
@@ -27,7 +27,7 @@ __global__ void lorenzo_3d1l(Data*, size_t*, double*);
 
 }  // namespace dryrun
 
-namespace workflow {
+namespace interface {
 
 template <typename Data>
 void DryRun(Data*, Data*, std::string, size_t*, double*);

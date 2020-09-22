@@ -5,7 +5,7 @@
  *        This functionality is placed in a separate compilation unit
  *        as thrust calls fail in par_huffman.cu.
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on: 2020-07
  *
  * @copyright Copyright (c) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
@@ -17,8 +17,10 @@
 #include <thrust/sort.h>
 #include <cstdint>
 
+#include "par_huffman_sortbyfreq.cuh"
+
 template <typename K, typename V>
-void SortByFreq(K* freq, V* qcode, int size)
+void lossless::par_huffman::impl::SortByFreq(K* freq, V* qcode, int size)
 {
     using namespace thrust;
     sort_by_key(
@@ -27,6 +29,6 @@ void SortByFreq(K* freq, V* qcode, int size)
         device_ptr<V>(qcode));
 }
 
-template void SortByFreq<unsigned int, uint8_t>(unsigned int*, uint8_t*, int);
-template void SortByFreq<unsigned int, uint16_t>(unsigned int*, uint16_t*, int);
-template void SortByFreq<unsigned int, uint32_t>(unsigned int*, uint32_t*, int);
+template void lossless::par_huffman::impl::SortByFreq<unsigned int, uint8_t>(unsigned int*, uint8_t*, int);
+template void lossless::par_huffman::impl::SortByFreq<unsigned int, uint16_t>(unsigned int*, uint16_t*, int);
+template void lossless::par_huffman::impl::SortByFreq<unsigned int, uint32_t>(unsigned int*, uint32_t*, int);

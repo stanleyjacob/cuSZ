@@ -5,7 +5,7 @@
  *        Based on [Ostadzadeh et al. 2007] (https://dblp.org/rec/conf/pdpta/OstadzadehEZMB07.bib)
  *        "A Two-phase Practical Parallel Algorithm for Construction of Huffman Codes".
  * @version 0.1
- * @date 2020-09-20
+ * @date 2020-09-21
  * Created on: 2020-06
  *
  * @copyright Copyright (c) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
@@ -26,18 +26,6 @@
 using namespace std;
 using namespace cooperative_groups;
 
-// Helper kernels
-template <typename T>
-__global__ void GPU_FillArraySequence(T* array, unsigned int size);
-template <typename T>
-__global__ void GPU_GetFirstNonzeroIndex(T* array, unsigned int size, unsigned int* result);
-template <typename T, typename Q>
-__global__ void GPU_ReorderByIndex(T* array, Q* index, unsigned int size);
-template <typename T>
-__global__ void GPU_ReverseArray(T* array, unsigned int size);
-
-// Parallel huffman global memory and kernels
-namespace parHuff {
 // GenerateCL Locals
 __device__ int iNodesFront = 0;
 __device__ int iNodesRear  = 0;
@@ -64,11 +52,31 @@ __device__ int newCDPI;
 __device__ long long int s[10];
 __device__ long long int st[10];
 
+namespace lossless {
+namespace par_huffman {  // parallel huffman global memory and kernels
+
+namespace impl {  // helper kernels
+template <typename T>
+__global__ void GPU_FillArraySequence(T* array, unsigned int size);
+
+template <typename T>
+__global__ void GPU_GetFirstNonzeroIndex(T* array, unsigned int size, unsigned int* result);
+
+template <typename T, typename Q>
+__global__ void GPU_ReorderByIndex(T* array, Q* index, unsigned int size);
+
+template <typename T>
+__global__ void GPU_ReverseArray(T* array, unsigned int size);
+
+__global__ void GPU_GetMaxCWLength(unsigned int* CL, unsigned int size, unsigned int* result);
+
+}  // namespace impl
+
 // Codeword length
 // clang-format off
 template <typename F>
 __global__ void GPU_GenerateCL(
-    F*  histogram, F*  CL, int size,
+    F* histogram,  F* CL,  int size,
     /* Global Arrays */
     F* lNodesFreq,  int* lNodesLeader,    
     F* iNodesFreq,  int* iNodesLeader,
@@ -80,13 +88,11 @@ __global__ void GPU_GenerateCL(
 // Forward Codebook
 template <typename F, typename H>
 __global__ void GPU_GenerateCW(F* CL, H* CW, H* first, H* entry, int size);
-}  // namespace parHuff
-
-// Thrust sort functionality implemented in separate file
-template <typename K, typename V>
-void SortByFreq(K* freq, V* qcode, int size);
 
 template <typename Q, typename H>
 void ParGetCodebook(int stateNum, unsigned int* freq, H* codebook, uint8_t* meta);
+
+}  // namespace par_huffman
+}  // namespace lossless
 
 #endif
