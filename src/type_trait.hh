@@ -29,54 +29,29 @@ struct MetadataTrait<3> {
     typedef struct Metadata<8> metadata_t;
 };
 
-template <int quant_cap>
+template <int QuantByte>
 struct QuantTrait;
 
 template <>
-struct QuantTrait<32> {
+struct QuantTrait<1> {
     typedef unsigned char Quant;
 };
+
 template <>
-struct QuantTrait<64> {
-    typedef unsigned char Quant;
-};
-template <>
-struct QuantTrait<128> {
-    typedef unsigned char Quant;
-};
-template <>
-struct QuantTrait<256> {
-    typedef unsigned char Quant;
-};
-template <>
-struct QuantTrait<512> {
+struct QuantTrait<2> {
     typedef unsigned short Quant;
 };
+
+template <int HuffByte>
+struct HuffTrait;
+
 template <>
-struct QuantTrait<1024> {
-    typedef unsigned short Quant;
+struct HuffTrait<4> {
+    typedef unsigned long Huff;
 };
+
 template <>
-struct QuantTrait<2048> {
-    typedef unsigned char Quant;
-};
-template <>
-struct QuantTrait<4096> {
-    typedef unsigned char Quant;
-};
-template <>
-struct QuantTrait<8192> {
-    typedef unsigned char Quant;
-};
-template <>
-struct QuantTrait<16384> {
-    typedef unsigned char Quant;
-};
-template <>
-struct QuantTrait<32768> {
-    typedef unsigned char Quant;
-};
-template <>
-struct QuantTrait<65536> {
-    typedef unsigned char Quant;
+struct HuffTrait<8> {
+    // TODO there is an issue about difference betwen ull and uint64_t
+    typedef unsigned long long Huff;
 };

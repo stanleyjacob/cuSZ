@@ -22,10 +22,12 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <string>
 #include <type_traits>
 #include <typeinfo>
 
 #include "argparse.hh"
+#include "argparse2_cusz.hh"
 #include "constants.hh"
 #include "cuda_error_handling.cuh"
 #include "cuda_mem.cuh"
@@ -37,6 +39,7 @@
 #include "gather_scatter.cuh"
 #include "huffman_workflow.cuh"
 #include "io.hh"
+#include "metadata.hh"
 #include "verify.hh"
 
 using std::cerr;
@@ -55,6 +58,10 @@ __constant__ double symb_ebs[4];
 
 typedef std::tuple<size_t, size_t, size_t> tuple3ul;
 
+/**
+ * @deprecated substitute this in 0.1.1 or higher
+
+ */
 template <typename Data, typename Quant>
 void cusz::impl::PdQ(Data* d_data, Quant* d_q, size_t* dims_L16, double* ebs_L4)
 {
@@ -103,6 +110,18 @@ template void cusz::impl::PdQ<float, uint32_t>(float* d_data, uint32_t* d_q, siz
 // template void cusz::impl::PdQ<double, uint16_t>(double* d_data, uint16_t* d_q, size_t* dims_L16, double* ebs_L4);
 // template void cusz::impl::PdQ<double, uint32_t>(double* d_data, uint32_t* d_q, size_t* dims_L16, double* ebs_L4);
 
+/**
+ * @brief
+ * @deprecated substitute this in 0.1.1 or higher
+ *
+ * @tparam Data
+ * @tparam Quant
+ * @param d_xdata
+ * @param d_q
+ * @param d_outlier
+ * @param dims_L16
+ * @param _2eb
+ */
 template <typename Data, typename Quant>
 void cusz::impl::ReversedPdQ(Data* d_xdata, Quant* d_q, Data* d_outlier, size_t* dims_L16, double _2eb)
 {
@@ -145,6 +164,9 @@ void cusz::impl::ReversedPdQ(Data* d_xdata, Quant* d_q, Data* d_outlier, size_t*
     cudaFree(d_dims_L16);
 }
 
+/**
+ * @deprecated in 0.1.1
+ */
 template <typename Data, typename Quant>
 void cusz::impl::VerifyHuffman(
     string const& fi,
@@ -209,6 +231,9 @@ void cusz::impl::VerifyHuffman(
     // end of if count
 }
 
+/**
+ * @deprecated soon
+ */
 template <typename Data, typename Quant, typename Huff>
 void cusz::interface::Compress(
     std::string& fi,
@@ -267,6 +292,9 @@ void cusz::interface::Compress(
     cudaFree(d_data);
 }
 
+/**
+ * @deprecated soon
+ */
 template <typename Data, typename Quant, typename Huff>
 void cusz::interface::Decompress(
     std::string& fi,  //
