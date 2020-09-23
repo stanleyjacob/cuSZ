@@ -51,17 +51,20 @@ class ArgParser {
     std::string fname;
 
     bool use_demo;
-    bool wf_dryrun;
 
     static std::string format(const std::string& s);
 
     void trap(int status) { this->ap_status = status; }
 
    public:
+    bool wf_dryrun;
+
     ArgParser() {}
     ~ArgParser() {}
 
-    int get_ndim() const { return this->ndim; };  // TODO redundant
+    int get_ndim() const { return ndim; };
+
+    std::string get_fname() const { return fname; }
 
     int str2int(const char* s);
 

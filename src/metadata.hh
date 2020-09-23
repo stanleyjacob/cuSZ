@@ -27,10 +27,9 @@ struct Metadata {
     size_t       stride0, stride1, stride2, stride3;
     size_t       nb0, nb1, nb2, nb3;
     size_t       cap, radius;
-
-    int nnz;
-
-    double eb, ebx2, eb_r, ebx2_r;
+    int          nnz;
+    size_t       total_bits, total_uInt, huffman_metadata_size;
+    double       eb, ebx2, eb_r, ebx2_r;
 };
 
 template <size_t Block>
@@ -95,8 +94,5 @@ void cuszChangeToR2RModeMode(struct Metadata<Block>* m, double val_rng)
     auto _eb = m->eb * val_rng;
     cuszSetErrorBound(m, _eb);
 };
-
-typedef struct Context {
-} context_t;
 
 #endif
