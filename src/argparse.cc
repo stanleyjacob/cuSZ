@@ -468,9 +468,7 @@ ArgPack::ArgPack(int argc, char** argv, bool huffman)
                 // ----------------------------------------------------------------
                 case 'i':
                 _INPUT_DATUM:
-                    if (i + 1 <= argc) {
-                        fname = string(argv[++i]);
-                    }
+                    if (i + 1 <= argc) { fname = string(argv[++i]); }
                     break;
                 case 'R':
                 _REP:
@@ -658,9 +656,7 @@ ArgPack::ArgPack(int argc, char** argv)
                 // ----------------------------------------------------------------
                 case '1':
                     n_dim = 1;
-                    if (i + 1 <= argc) {
-                        d0 = str2int(argv[++i]);
-                    }
+                    if (i + 1 <= argc) { d0 = str2int(argv[++i]); }
                     break;
                 case '2':
                     n_dim = 2;
@@ -724,16 +720,12 @@ ArgPack::ArgPack(int argc, char** argv)
                     //                        break;
                     //                    }
                 _INPUT_DATUM:
-                    if (i + 1 <= argc) {
-                        fname = string(argv[++i]);
-                    }
+                    if (i + 1 <= argc) { fname = string(argv[++i]); }
                     break;
                     // alternative output
                 case 'o':
                 _OUT:
-                    if (i + 1 <= argc) {
-                        alt_xout_name = string(argv[++i]);
-                    }
+                    if (i + 1 <= argc) { alt_xout_name = string(argv[++i]); }
                     break;
                 // preprocess
                 case 'p':

@@ -15,9 +15,11 @@
 #define FORMAT_HH
 
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include <string>
 
+using std::regex;
 using std::string;
 
 extern const string log_null;
@@ -26,6 +28,17 @@ extern const string log_dbg;
 extern const string log_info;
 extern const string log_warn;
 
+extern const string fmt_b;
+extern const string fmt_0;
+
+extern const regex  bful;
+extern const string bful_text;
+extern const regex  bf;
+extern const string bf_text;
+extern const regex  ul;
+extern const string ul_text;
+extern const regex  red;
+extern const string red_text;
 namespace cusz {
 namespace log {
 

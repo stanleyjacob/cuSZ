@@ -13,16 +13,30 @@
 
 #include "format.hh"
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include <string>
 
+using std::regex;
 using std::string;
 
-const string log_null = "       ";
+const string log_null = "       ";  // width = 7
 const string log_err  = "\e[31m[ERR]\e[0m  ";
 const string log_dbg  = "\e[34m[dbg]\e[0m  ";
 const string log_info = "\e[32m[info]\e[0m ";
 const string log_warn = "\e[31m[WARN]\e[0m ";
+
+const string fmt_b("\e[1m");
+const string fmt_0("\e[0m");
+
+const regex  bful("@(.*?)@");
+const string bful_text("\e[1m\e[4m$1\e[0m");
+const regex  bf("\\*(.*?)\\*");
+const string bf_text("\e[1m$1\e[0m");
+const regex  ul(R"(_((\w|-|\d|\.)+?)_)");
+const string ul_text("\e[4m$1\e[0m");
+const regex  red(R"(\^\^(.*?)\^\^)");
+const string red_text("\e[31m$1\e[0m");
 
 // https://stackoverflow.com/a/26080768/8740097
 template <typename T>
