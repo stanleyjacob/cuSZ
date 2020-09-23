@@ -450,7 +450,10 @@ ArgPack::ArgPack(int argc, char** argv, bool huffman)
                     if (string(argv[i]) == "--huffman-rep") goto _HUFFMANCODE;
                     if (string(argv[i]) == "--huffman-chunk") goto _HUFFMANCHUNKSIZE;
                     if (string(argv[i]) == "--dict-size") goto _DICT;
-                    if (string(argv[i]) == "--gzip") {to_gzip=true; break;}  //wenyu: if there is "--gzip", set member field to_gzip true
+                    if (string(argv[i]) == "--gzip") {
+                        to_gzip = true;
+                        break;
+                    }  // wenyu: if there is "--gzip", set member field to_gzip true
                 // work
                 // ----------------------------------------------------------------
                 case 'e':
@@ -677,7 +680,8 @@ ArgPack::ArgPack(int argc, char** argv)
                         break;
                     }
                     if (string(argv[i]) == "--gzip") {
-                        to_gzip=true; break;  //wenyu: if there is "--gzip", set member field to_gzip true
+                        to_gzip = true;
+                        break;  // wenyu: if there is "--gzip", set member field to_gzip true
                     }
                     // if (string(argv[i]) == "--coname") {
                     //     // TODO does not apply for preprocessed such as binning
@@ -907,9 +911,8 @@ void ArgPack::SortOutFilenames()
     // (2) "./fname"        -> "./" "fname"
     // (3) "/path/to/fname" -> "/path/to", "fname"
     auto cx_input_path = cx_path2file.substr(0, cx_path2file.rfind("/") + 1);
-    if(to_extract)
-        cx_path2file=cx_path2file.substr(0,cx_path2file.rfind("."));
-    auto cx_basename   = cx_path2file.substr(cx_path2file.rfind("/") + 1);
+    if (to_extract) cx_path2file = cx_path2file.substr(0, cx_path2file.rfind("."));
+    auto cx_basename = cx_path2file.substr(cx_path2file.rfind("/") + 1);
 
     if (opath == "") opath = cx_input_path == "" ? opath = "" : opath = cx_input_path;
     opath += "/";
