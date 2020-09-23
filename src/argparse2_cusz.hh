@@ -46,6 +46,10 @@ class cuszContext : ArgParser {
     cuszContext(int argc, char** argv);
     ~cuszContext(){};
 
+    using ArgParser::get_fname;
+    using ArgParser::get_ndim;
+    using ArgParser::wf_dryrun;
+
     virtual void CheckArgs();
     virtual void PrintShortDoc();
     virtual void PrintFullDoc();
