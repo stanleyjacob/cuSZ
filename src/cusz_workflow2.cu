@@ -108,8 +108,25 @@ void cusz::interface::Compress2(cuszContext* ctx, struct Metadata<Block>* m)
 template <int ndim, int Block, typename Data, int QuantByte, int HuffByte>
 void cusz::interface::Decompress2(cuszContext* ctx, struct Metadata<Block>* m)
 {
+    typedef struct Metadata<Block>                metadata_t;  // instead of `typename`
+    typedef typename QuantTrait<QuantByte>::Quant Quant;
+    typedef typename HuffTrait<HuffByte>::Huff    Huff;
 
+    string fo_x       = ctx->get_fname() + ".szx";
+    string fi_qbase   = ctx->get_fname() + ".b" + std::to_string(QuantByte * 8);
+    string fi_outlier = fi_qbase + ".outlier";
 
+    auto M   = ::cusz::impl::GetEdgeOfReinterpretedSquare(m->len);
+    auto MxM = M * M;
+
+    Quant* xq;
+    // step 1: read from filesystem or do Huffman decoding to get quant code
+    if (ctx->skip_huff) { xq = io::ReadBinaryFile<Quant>(fi_qbase, m->len); }
+    else {
+        xq = ::lossless::interface::HuffmanDecode<Quant, Huff>(
+            fi_qbase, m->len, ctx->h_chunksize, m->total_uint, m->cap);
+        if (ctx->verify_huffman) cusz::impl::VerifyHuffman<Data, Quant>(ctx, m, xq);
+    }
 }
 
 template <int ndim, int Block, typename Data, typename Quant>
