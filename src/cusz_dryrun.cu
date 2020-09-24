@@ -18,6 +18,7 @@
 #include "cusz_dualquant.cuh"
 #include "format.hh"
 #include "io.hh"
+#include "metadata.hh"
 #include "verify.hh"
 
 using std::cerr;
@@ -47,6 +48,45 @@ const int B_1d = 32;
 const int B_2d = 16;
 const int B_3d = 8;
 
+template <int Block, typename Data>
+__global__ void cusz::dryrun::lorenzo_1d1l(struct Metadata<Block>* m, Data* d)
+{
+    auto id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (id >= m->d0) return;
+    d[id] = round(d[id] * m->ebx2_r) * m->ebx2;  // prequant
+}
+
+template <int Block, typename Data>
+__global__ void cusz::dryrun::lorenzo_2d1l(struct Metadata<Block>* m, Data* d)
+{
+    auto   y   = threadIdx.y;
+    auto   x   = threadIdx.x;
+    auto   gi1 = blockIdx.y * blockDim.y + y;
+    auto   gi0 = blockIdx.x * blockDim.x + x;
+    size_t id  = gi0 + gi1 * m->stride1;  // low to high dim, inner to outer
+    if (gi0 >= m->d0 or gi1 >= m->d1) return;
+    d[id] = round(d[id] * m->ebx2_r) * m->ebx2;  // prequant
+}
+
+template <int Block, typename Data>
+__global__ void cusz::dryrun::lorenzo_3d1l(struct Metadata<Block>* m, Data* d)
+{
+    auto   gi2 = blockIdx.z * blockDim.z + threadIdx.z;
+    auto   gi1 = blockIdx.y * blockDim.y + threadIdx.y;
+    auto   gi0 = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t id  = gi0 + gi1 * m->stride1 + gi2 * m->stride2;  // low to high in dim, inner to outer
+    if (gi0 >= m->d0 or gi1 >= m->d1 or gi2 >= m->d2) return;
+    d[id] = round(d[id] * m->ebx2_r) * m->ebx2;  // prequant
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @deprecated 0.1.1 or higher
+ */
 template <typename Data>
 __global__ void cusz::dryrun::lorenzo_1d1l(Data* data, size_t* dims_L16, double* ebs_L4)
 {
@@ -55,6 +95,9 @@ __global__ void cusz::dryrun::lorenzo_1d1l(Data* data, size_t* dims_L16, double*
     data[id] = round(data[id] * ebs_L4[EBx2_r]) * ebs_L4[EBx2];  // prequantization
 }
 
+/**
+ * @deprecated 0.1.1 or higher
+ */
 template <typename Data>
 __global__ void cusz::dryrun::lorenzo_2d1l(Data* data, size_t* dims_L16, double* ebs_L4)
 {
@@ -67,6 +110,9 @@ __global__ void cusz::dryrun::lorenzo_2d1l(Data* data, size_t* dims_L16, double*
     data[id] = round(data[id] * ebs_L4[EBx2_r]) * ebs_L4[EBx2];  // prequantization
 }
 
+/**
+ * @deprecated 0.1.1 or higher
+ */
 template <typename Data>
 __global__ void cusz::dryrun::lorenzo_3d1l(Data* data, size_t* dims_L16, double* ebs_L4)
 {
