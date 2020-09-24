@@ -13,10 +13,11 @@
 
 #include "argparse2.hh"
 #include "argparse2_cusz.hh"
+#include "cusz_workflow2.cuh"
 #include "metadata.hh"
 #include "type_trait.hh"
-typedef cuszContext context_t;
 
+typedef cuszContext context_t;
 
 template <int ndim, typename Data, int QuantByte, int HuffByte>
 void main_alt(cuszContext* ctx, unsigned char* archive_bin, unsigned char* metadata_bin)
@@ -34,6 +35,3 @@ void main_alt(cuszContext* ctx, unsigned char* archive_bin, unsigned char* metad
     if (ctx->wf_zip or ctx->wf_dryrun) cusz::interface::Compress2<Data, QuantByte, HuffByte>(ctx, m);
     if (ctx->wf_unzip) cusz::interface::Decompress2<Data, QuantByte, HuffByte>(ctx, m);
 }
-
-}
-
