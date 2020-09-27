@@ -1,22 +1,16 @@
 #STRICT_CHECK=-Xcompiler -Wall
 #PTX_VERBOSE=-Xptxas -O3,-v
 
-
 #CXX       := clang++ -fPIE
 CXX       := g++
 NVCC      := nvcc
-<<<<<<< HEAD
 STD       := -std=c++14
-=======
-STD       := -std=c++11
->>>>>>> add "Huffman (re)"
 HOST_DBG  := -O0 -g
 CUDA_DBG  := -O0 -G -g
 SRC_DIR   := src
 OBJ_DIR   := src
 BIN_DIR   := bin
 
-<<<<<<< HEAD
 GPU_PASCAL:= -gencode=arch=compute_60,code=sm_60 -gencode=arch=compute_61,code=sm_61
 GPU_VOLTA := -gencode=arch=compute_70,code=sm_70
 GPU_TURING:= -gencode=arch=compute_75,code=sm_75
@@ -33,14 +27,6 @@ endif
 ifeq ($(shell test $(CUDA_MAJV) -ge 11; echo $$?), 0)
   DEPLOY += $(GPU_AMPERE)
 endif
-=======
-GPU_VOLTA := -gencode=arch=compute_70,code=sm_70
-GPU_TURING:= -gencode=arch=compute_75,code=sm_75
-DEPLOY    := $(GPU_VOLTA) $(GPU_TURING)
-
-CCFLAGS   := $(STD) -O3
-NVCCFLAGS := $(STD) $(DEPLOY)
->>>>>>> add "Huffman (re)"
 
 CCFLAGS   := $(STD) -O3
 NVCCFLAGS := $(STD) $(DEPLOY) --expt-relaxed-constexpr
@@ -78,6 +64,7 @@ _DEPS_HIST := $(SRC_DIR)/histogram.o $(SRC_DIR)/huffman_workflow.o $(SRC_DIR)/fo
 _DEPS_OLDENC := $(SRC_DIR)/huffman_codec.o $(SRC_DIR)/par_huffman.o $(SRC_DIR)/par_huffman_sortbyfreq.o $(SRC_DIR)/par_merge.o
 DEPS_HUFF := $(_DEPS_MEM) $(_DEPS_HIST) $(_DEPS_OLDENC) $(_DEPS_ARG)
 
+<<<<<<< HEAD
 =======
 HUFF_DIR   := $(SRC_DIR)/huffre
 
@@ -86,6 +73,9 @@ _DEPS_MEM  := $(SRC_DIR)/cuda_mem.o
 _DEPS_HIST := $(SRC_DIR)/histogram.o $(SRC_DIR)/huffman_workflow.o $(SRC_DIR)/format.o $(SRC_DIR)/canonical.o $(SRC_DIR)/huffman.o -rdc=true
 _DEPS_OLDENC := $(SRC_DIR)/huffman_codec.o
 DEPS_HUFF := $(_DEPS_MEM) $(_DEPS_HIST) $(_DEPS_OLDENC) $(_DEPS_ARG)
+=======
+HUFF_DIR := src/huffre
+>>>>>>> fix; change magnitude; rename type
 
 huff: $(HUFF_DIR)/huff.cu $(SRC_DIR)/argparse.cc
 	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huff.cu -o huff
