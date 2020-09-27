@@ -24,25 +24,23 @@ namespace interface {
 
 template <typename Data, typename Quant, typename Huff>
 void Compress(
-    std::string& fi,  //
-    size_t*      dims_L16,
-    double*      ebs_L4,
-    int&         nnz_outlier,
-    size_t&      n_bits,
-    size_t&      n_uInt,
-    size_t&      huffman_metadata_size,
-    argpack*     ap);
+    argpack* ap,
+    size_t*  dims_L16,
+    double*  ebs_L4,
+    int&     nnz_outlier,
+    size_t&  n_bits,
+    size_t&  n_uInt,
+    size_t&  huffman_metadata_size);
 
 template <typename Data, typename Quant, typename Huff>
 void Decompress(
-    std::string& fi,
-    size_t*      dims_L16,
-    double*      ebs_L4,
-    int&         nnz_outlier,
-    size_t&      total_bits,
-    size_t&      total_uInt,
-    size_t&      huffman_metadata_size,
-    argpack*     ap);
+    argpack* ap,
+    size_t*  dims_L16,
+    double*  ebs_L4,
+    int&     nnz_outlier,
+    size_t&  total_bits,
+    size_t&  total_uInt,
+    size_t&  huffman_metadata_size);
 
 }  // namespace interface
 

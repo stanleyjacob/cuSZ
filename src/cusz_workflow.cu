@@ -231,24 +231,22 @@ void cusz::impl::VerifyHuffman(
     // end of if count
 }
 
-/**
- * @deprecated soon
- */
-template <typename Data, typename Quant, typename Huff>
-void cusz::interface::Compress(
-    std::string& fi,
-    size_t*      dims_L16,
-    double*      ebs_L4,
-    int&         nnz_outlier,
-    size_t&      n_bits,
-    size_t&      n_uInt,
-    size_t&      huffman_metadata_size,
-    argpack*     ap)
+template <typename T, typename Q, typename H>
+void cusz::workflow::Compress(
+    argpack* ap,
+    size_t*  dims_L16,
+    double*  ebs_L4,
+    int&     nnz_outlier,
+    size_t&  n_bits,
+    size_t&  n_uInt,
+    size_t&  huffman_metadata_size)
 {
-    int    bw         = sizeof(Quant) * 8;
-    string fo_cdata   = fi + ".sza";
-    string fo_q       = fi + ".b" + std::to_string(bw);
-    string fo_outlier = fi + ".b" + std::to_string(bw) + ".outlier";
+    // int bw = sizeof(Q) * 8;
+    // string fo_cdata   = ap->opath + "/" + fi + ".sza";
+    // string fo_base    = ap->cx_path2file.substr(ap->cx_path2file.rfind("/") + 1);  // token is "scott"
+    // string fo_bcode   = ap->opath + fo_base + ".b" + std::to_string(bw);
+    // string fo_outlier = ap->opath + fo_base + ".b" + std::to_string(bw) + ".outlier";
+    // cout << fo_outlier << endl;
 
     // TODO to use a struct
     size_t len = dims_L16[LEN];
@@ -261,9 +259,9 @@ void cusz::interface::Compress(
     io::ReadBinaryFile<Data>(fi, data, len);
     Data* d_data = mem::CreateDeviceSpaceAndMemcpyFromHost(data, mxm);
 
-    if (ap->dry_run) {
+    if (ap->to_dryrun) {
         cout << "\n" << log_info << "Commencing dry-run..." << endl;
-        DryRun(data, d_data, fi, dims_L16, ebs_L4);
+        DryRun(data, d_data, ap->cx_path2file, dims_L16, ebs_L4);
         exit(0);
     }
     cout << "\n" << log_info << "Commencing compression..." << endl;
@@ -271,20 +269,20 @@ void cusz::interface::Compress(
     auto d_q = mem::CreateCUDASpace<Quant>(len);  // quant. code is not needed for dry-run
 
     // prediction-quantization
-    ::cusz::impl::PdQ(d_data, d_q, dims_L16, ebs_L4);
-    ::cusz::impl::PruneGatherAsCSR(d_data, mxm, m /*lda*/, m /*m*/, m /*n*/, nnz_outlier, &fo_outlier);
+    ::cusz::impl::PdQ(d_data, d_bcode, dims_L16, ebs_L4);
+    ::cusz::impl::PruneGatherAsCSR(d_data, mxm, m /*lda*/, m /*m*/, m /*n*/, nnz_outlier, &ap->c_fo_outlier);
     cout << log_info << "nnz.outlier:\t" << nnz_outlier << "\t(" << (nnz_outlier / 1.0 / len * 100) << "%)" << endl;
 
     Quant* q;
     if (ap->skip_huffman) {
         q = mem::CreateHostSpaceAndMemcpyFromDevice(d_q, len);
-        io::WriteBinaryFile(q, len, &fo_q);
+        io::WriteArrayToBinary(ap->c_fo_q, bcode, len);
         cout << log_info << "Compression finished, saved quant.code (Huffman skipped).\n" << endl;
         return;
     }
 
     std::tie(n_bits, n_uInt, huffman_metadata_size) =
-        lossless::interface::HuffmanEncode<Quant, Huff>(fo_q, d_q, len, ap->huffman_chunk, dims_L16[CAP]);
+        lossless::interface::HuffmanEncode<Quant, Huff>(ap->c_huff_base, d_q, len, ap->huffman_chunk, dims_L16[CAP]);
 
     cout << log_info << "Compression finished, saved Huffman encoded quant.code.\n" << endl;
 
@@ -295,24 +293,16 @@ void cusz::interface::Compress(
 /**
  * @deprecated soon
  */
-template <typename Data, typename Quant, typename Huff>
+template <typename T, typename Q, typename H>
 void cusz::interface::Decompress(
-    std::string& fi,  //
-    size_t*      dims_L16,
-    double*      ebs_L4,
-    int&         nnz_outlier,
-    size_t&      total_bits,
-    size_t&      total_uInt,
-    size_t&      huffman_metadata_size,
-    argpack*     ap)
+    argpack* ap,
+    size_t*  dims_L16,
+    double*  ebs_L4,
+    int&     nnz_outlier,
+    size_t&  total_bits,
+    size_t&  total_uInt,
+    size_t&  huffman_metadata_size)
 {
-    //    string f_archive = fi + ".sza"; // TODO
-    string f_extract = ap->alt_xout_name.empty() ? fi + ".szx" : ap->alt_xout_name;
-    string fi_q_base, fi_q_after_huffman, fi_outlier, fi_outlier_as_cuspm;
-
-    fi_q_base           = fi + ".b" + std::to_string(sizeof(Quant) * 8);
-    fi_outlier_as_cuspm = fi_q_base + ".outlier";
-
     auto dict_size = dims_L16[CAP];
     auto len       = dims_L16[LEN];
     auto m         = ::cusz::impl::GetEdgeOfReinterpretedSquare(len);
@@ -324,21 +314,25 @@ void cusz::interface::Decompress(
     // step 1: read from filesystem or do Huffman decoding to get quant code
     if (ap->skip_huffman) {
         cout << log_info << "Getting quant.code from filesystem... (Huffman encoding was skipped.)" << endl;
-        xq = io::ReadBinaryFile<Quant>(fi_q_base, len);
+        xq = io::ReadBinaryFile<Quant>(ap->x_fi_q, len);
     }
     else {
         cout << log_info << "Huffman decoding into quant.code." << endl;
-        xq =
-            ::lossless::interface::HuffmanDecode<Quant, Huff>(fi_q_base, len, ap->huffman_chunk, total_uInt, dict_size);
+        xq = HuffmanDecode<Quant, Huff>(ap->cx_path2file, len, ap->huffman_chunk, total_uInt, dict_size);
         if (ap->verify_huffman) {
+            // TODO check in argpack
+            if (ap->x_fi_origin == "") {
+                cerr << log_err << "use \"--orogin /path/to/origin_data\" to specify the original dataum." << endl;
+                exit(-1);
+            }
             cout << log_info << "Verifying Huffman codec..." << endl;
-            ::cusz::impl::VerifyHuffman<Data, Quant>(fi, len, xq, ap->huffman_chunk, dims_L16, ebs_L4);
+            ::cusz::impl::VerifyHuffman<Data, Quant>(ap->x_fi_origin, len, xbcode, ap->huffman_chunk, dims_L16, ebs_L4);
         }
     }
     auto d_q = mem::CreateDeviceSpaceAndMemcpyFromHost(xq, len);
 
-    auto d_outlier = mem::CreateCUDASpace<Data>(mxm);
-    ::cusz::impl::ScatterFromCSR<Data>(d_outlier, mxm, m /*lda*/, m /*m*/, m /*n*/, &nnz_outlier, &fi_outlier_as_cuspm);
+    auto d_outlier = mem::CreateCUDASpace<T>(mxm);
+    ::cusz::impl::ScatterFromCSR<Data>(d_outlier, mxm, m /*lda*/, m /*m*/, m /*n*/, &nnz_outlier, &ap->x_fi_outlier);
 
     // TODO merge d_outlier and d_data
     auto d_xdata = mem::CreateCUDASpace<Data>(len);
@@ -347,8 +341,6 @@ void cusz::interface::Decompress(
 
     cout << log_info << "Decompression finished.\n\n";
 
-    // TODO move CR out of VerifyData
-    auto   odata        = io::ReadBinaryFile<Data>(fi, len);
     size_t archive_size = 0;
     // TODO huffman chunking metadata
     if (not ap->skip_huffman)
@@ -386,23 +378,28 @@ void cusz::interface::Decompress(
         cout << log_info << "Huffman coded output size: " << total_uInt * sizeof(Huff) << endl;
     }
 
-    analysis::VerifyData(
-        xdata, odata,
-        len,         //
-        false,       //
-        ebs_L4[EB],  //
-        archive_size,
-        ap->pre_binning ? 4 : 1);  // suppose binning is 2x2
+    // TODO move CR out of VerifyData
+    T* odata;
+    if (ap->x_fi_origin != "") {
+        cout << log_info << "To compare with the original datum" << endl;
+        odata = io::ReadBinaryFile<T>(ap->x_fi_origin, len);
+        analysis::VerifyData(
+            xdata, odata,
+            len,         //
+            false,       //
+            ebs_L4[EB],  //
+            archive_size,
+            ap->pre_binning ? 4 : 1);  // TODO use template rather than 2x2
+    }
 
-    if (!ap->skip_writex) {
-        if (!ap->alt_xout_name.empty())
-            cout << log_info << "Default decompressed data is renamed from " << string(fi + ".szx") << " to "
-                 << f_extract << endl;
-        io::WriteBinaryFile(xdata, len, &f_extract);
+    if (!ap->skip_writex)
+        io::WriteArrayToBinary(ap->x_fo_xd, xdata, len);
+    else {
+        cout << log_info << "Skipped writing unzipped to filesystem." << endl;
     }
 
     // clean up
-    delete[] odata;
+    if (odata) delete[] odata;
     delete[] xdata;
     delete[] xq;
     cudaFree(d_xdata);
@@ -410,28 +407,20 @@ void cusz::interface::Decompress(
     cudaFree(d_q);
 }
 
-template void cusz::interface::Compress<float, uint8__t, uint32_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
-template void cusz::interface::Compress<float, uint8__t, uint64_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
-template void cusz::interface::Compress<float, uint16_t, uint32_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
-template void cusz::interface::Compress<float, uint16_t, uint64_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
-template void cusz::interface::Compress<float, uint32_t, uint32_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
-template void cusz::interface::Compress<float, uint32_t, uint64_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
+template void
+cusz::interface::Compress<float, uint8__t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+template void
+cusz::interface::Compress<float, uint8__t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+template void
+cusz::interface::Compress<float, uint16_t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+template void
+cusz::interface::Compress<float, uint16_t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
 
-template void cusz::interface::Decompress<float, uint8__t, uint32_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
-template void cusz::interface::Decompress<float, uint8__t, uint64_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
-template void cusz::interface::Decompress<float, uint16_t, uint32_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
-template void cusz::interface::Decompress<float, uint16_t, uint64_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
-template void cusz::interface::Decompress<float, uint32_t, uint32_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
-template void cusz::interface::Decompress<float, uint32_t, uint64_t>  //
-    (string&, size_t*, double*, int&, size_t&, size_t&, size_t&, argpack*);
+template void
+cusz::interface::Decompress<float, uint8__t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+template void
+cusz::interface::Decompress<float, uint8__t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+template void
+cusz::interface::Decompress<float, uint16_t, uint32_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
+template void
+cusz::interface::Decompress<float, uint16_t, uint64_t>(argpack*, size_t*, double*, int&, size_t&, size_t&, size_t&);
