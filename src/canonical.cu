@@ -1,4 +1,15 @@
-// jtian 20-04-10
+/**
+ * @file canonical.cu
+ * @author Jiannan Tian
+ * @brief Canonization of existing Huffman codebook.
+ * @version 0.1
+ * @date 2020-09-20
+ * Created on 2020-04-10
+ *
+ * @copyright Copyright (c) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
+ * See LICENSE in top-level directory
+ *
+ */
 
 #include <cooperative_groups.h>
 #include <stddef.h>
@@ -62,6 +73,7 @@ __global__ void GPU::GetCanonicalCode(uint8_t* singleton, int DICT_SIZE)
     o_cb[gid] = ~((H)0x0);
     g.sync();
 
+    // Reverse Codebook Generation -- TODO isolate
     if (gid == 0) {
         // no atomicRead to handle read-after-write (true dependency)
         for (int i = 0; i < DICT_SIZE; i++) {

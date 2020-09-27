@@ -1,6 +1,15 @@
-//
-// Created by jtian on 4/24/20.
-//
+/**
+ * @file huffman_workflow.cu
+ * @author Jiannan Tian, Cody Rivera (cjrivera1@crimson.ua.edu)
+ * @brief Workflow of Huffman coding.
+ * @version 0.1
+ * @date 2020-09-20
+ * Created on 2020-04-24
+ *
+ * @copyright Copyright (c) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
+ * See LICENSE in top-level directory
+ *
+ */
 
 #include <cuda_runtime.h>
 
@@ -27,19 +36,30 @@
 #include "huffman.cuh"
 #include "huffman_codec.cuh"
 #include "huffman_workflow.cuh"
+#include "par_huffman.cuh"
 #include "types.hh"
 
 int ht_state_num;
 int ht_all_nodes;
+using uint8__t = uint8_t;
 
 template <typename Q>
 void wrapper::GetFrequency(Q* d_bcode, size_t len, unsigned int* d_freq, int dict_size)
 {
     // Parameters for thread and block count optimization
-    int maxbytes       = 98304;
+
+    // Initialize to device-specific values
+    int deviceId;
+    int maxbytes;
+    int numSMs;
+
+    cudaGetDevice(&deviceId);
+    cudaDeviceGetAttribute(&maxbytes, cudaDevAttrMaxSharedMemoryPerMultiprocessor, deviceId);
+    cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, deviceId);
+
+    // Optimize launch
     int numBuckets     = dict_size;
     int numValues      = len;
-    int numSMs         = 84;  // set up parameters for V100
     int itemsPerThread = 1;
     int RPerBlock      = (maxbytes / (int)sizeof(int)) / (numBuckets + 1);
     int numBlocks      = numSMs;
@@ -47,9 +67,7 @@ void wrapper::GetFrequency(Q* d_bcode, size_t len, unsigned int* d_freq, int dic
     // fits to size
     int threadsPerBlock = ((((numValues / (numBlocks * itemsPerThread)) + 1) / 64) + 1) * 64;
     while (threadsPerBlock > 1024) {
-        if (RPerBlock <= 1) {
-            threadsPerBlock = 1024;
-        }
+        if (RPerBlock <= 1) { threadsPerBlock = 1024; }
         else {
             RPerBlock /= 2;
             numBlocks *= 2;
@@ -113,59 +131,28 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Q* d_in, size_t l
     auto d_freq  = mem::CreateCUDASpace<unsigned int>(ht_all_nodes);
     wrapper::GetFrequency(d_in, len, d_freq, dict_size);
 
-    // get plain cbs
-    auto d_plain_cb = mem::CreateCUDASpace<H>(dict_size, 0xff);
-
-    // set up Huffman tree
-    {
-        InitHuffTreeAndGetCodebook<<<1, 32>>>(2 * dict_size, d_freq, d_plain_cb);
-        cudaDeviceSynchronize();
-    }
-
-    // get to know avg bitwidth
-    {
-        auto   plain_cb = mem::CreateHostSpaceAndMemcpyFromDevice(d_plain_cb, dict_size);
-        auto   freq     = mem::CreateHostSpaceAndMemcpyFromDevice(d_freq, dict_size);
-        auto   get_bw   = [](H& var) { return (int)*((uint8_t*)&var + sizeof(H) - 1); };
-        double avg_bw   = 0.0;
-        for (auto i = 0; i < dict_size; i++)
-            if (freq[i] != 0) {
-                avg_bw += get_bw(plain_cb[i]) * freq[i];
-            }
-        cout << log_info << "avg. bw:\t" << avg_bw / len << endl;
-    }
-
-    // canonical Huffman; TODO should follow H to decide first and entry type
+    // Allocate cb memory
+    auto d_canonical_cb = mem::CreateCUDASpace<H>(dict_size, 0xff);
+    // canonical Huffman; follows H to decide first and entry type
     auto type_bw = sizeof(H) * 8;
-    // input, output, canonical codebook; numl, iterators, first, entry, reversed codebook
-    auto total_bytes = sizeof(H) * (3 * dict_size) + sizeof(int) * (4 * type_bw) + sizeof(Q) * dict_size;
+    // first, entry, reversed codebook
+    // CHANGED first and entry to H type
+    auto decode_meta_size = sizeof(H) * (2 * type_bw) + sizeof(Q) * dict_size;
+    auto d_decode_meta    = mem::CreateCUDASpace<uint8_t>(decode_meta_size);
 
-    auto d_singleton = mem::CreateCUDASpace<uint8_t>(total_bytes);
+    // Get codebooks
+    ParGetCodebook<Q, H>(dict_size, d_freq, d_canonical_cb, d_decode_meta);
+    cudaDeviceSynchronize();
 
-    // canonize
-    {
-        auto d_input_cb = reinterpret_cast<H*>(d_singleton);
-        cudaMemcpy(d_input_cb, d_plain_cb, sizeof(H) * dict_size, cudaMemcpyDeviceToDevice);
-        void* args[] = {(void*)&d_singleton, (void*)&dict_size};
-        cudaLaunchCooperativeKernel(                     // CUDA9 API
-            (void*)GPU::GetCanonicalCode<H, Q>,          // kernel
-            dim3((dict_size - 1) / tBLK_CANONICAL + 1),  // gridDim
-            dim3(tBLK_CANONICAL),                        // blockDim
-            args);
-        cudaDeviceSynchronize();
-    }
-    auto singleton = mem::CreateHostSpaceAndMemcpyFromDevice(d_singleton, total_bytes);
-    auto first     = reinterpret_cast<int*>(singleton + sizeof(H) * (3 * dict_size)) + type_bw * 2;
+    auto decode_meta = mem::CreateHostSpaceAndMemcpyFromDevice(d_decode_meta, decode_meta_size);
 
-    // coding by memcpy
-    auto d_h            = mem::CreateCUDASpace<H>(len);
-    auto d_canonical_cb = reinterpret_cast<H*>(d_singleton) + dict_size;
+    // Non-deflated output
+    auto d_h = mem::CreateCUDASpace<H>(len);
 
     // --------------------------------
     // this is for internal evaluation, not in sz archive
-    auto cb_dump = mem::CreateHostSpaceAndMemcpyFromDevice(d_canonical_cb, dict_size);
-    io::WriteBinaryFile(cb_dump, dict_size, new string(f_in + ".canonized"));
-
+    // auto cb_dump = mem::CreateHostSpaceAndMemcpyFromDevice(d_canonical_cb, dict_size);
+    // io::WriteBinaryFile(cb_dump, dict_size, new string(f_in + ".canonized"));
     // --------------------------------
 
     // fix-length space
@@ -206,13 +193,16 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Q* d_in, size_t l
     auto total_bits  = std::accumulate(dH_bit_meta, dH_bit_meta + n_chunk, (size_t)0);
     auto total_uInts = std::accumulate(dH_uInt_meta, dH_uInt_meta + n_chunk, (size_t)0);
 
-    cout << log_info << "total.uInts:\t" << total_uInts << "\n";
-    cout << log_info << "total.bits:\t" << total_bits << "\n";
+    cout << log_dbg;
+    printf(
+        "Huffman bitstream: %lu chunks of size = %d, in %lu uint%lus or %lu bits\n", n_chunk, chunk_size, total_uInts,
+        sizeof(H) * 8, total_bits);
 
     // print densely metadata
     PrintChunkHuffmanCoding<H>(dH_bit_meta, dH_uInt_meta, len, chunk_size, total_bits, total_uInts);
 
     // copy back densely Huffman code in units of uInt (regarding endianness)
+    // TODO reinterpret_cast
     auto h = new H[total_uInts]();
     for (auto i = 0; i < n_chunk; i++) {
         cudaMemcpy(
@@ -222,26 +212,29 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Q* d_in, size_t l
             cudaMemcpyDeviceToHost);
     }
     // dump bit_meta and uInt_meta
-    io::WriteBinaryFile(h_meta + n_chunk, (2 * n_chunk), new string(f_in + ".hmeta"));
+    io::WriteArrayToBinary(f_in + ".hmeta", h_meta + n_chunk, (2 * n_chunk));
     // write densely Huffman code and its metadata
-    io::WriteBinaryFile(h, total_uInts, new string(f_in + ".dh"));
+    io::WriteArrayToBinary(f_in + ".hbyte", h, total_uInts);
     // to save first, entry and keys
-    io::WriteBinaryFile(                                      //
-        reinterpret_cast<uint8_t*>(first),                    //
-        sizeof(int) * (2 * type_bw) + sizeof(Q) * dict_size,  // first, entry, reversed dict (keys)
-        new string(f_in + ".cHcb"));
+    io::WriteArrayToBinary(
+        f_in + ".canon",                                   //
+        reinterpret_cast<uint8_t*>(decode_meta),           //
+        sizeof(H) * (2 * type_bw) + sizeof(Q) * dict_size  // first, entry, reversed dict (keys)
+    );
 
-    size_t metadata_size = (2 * n_chunk) * sizeof(decltype(h_meta))                //
-                           + sizeof(int) * (2 * type_bw) + sizeof(Q) * dict_size;  // uint8_t
+    size_t metadata_size = (2 * n_chunk) * sizeof(decltype(h_meta))              //
+                           + sizeof(H) * (2 * type_bw) + sizeof(Q) * dict_size;  // uint8_t
 
     //////// clean up
     cudaFree(d_in);
     cudaFree(d_freq);
-    cudaFree(d_plain_cb);
+    cudaFree(d_canonical_cb);
+    cudaFree(d_decode_meta);
     cudaFree(d_h);
     cudaFree(d_h_bitwidths);
     delete[] h;
     delete[] h_meta;
+    delete[] decode_meta;
 
     return std::make_tuple(total_bits, total_uInts, metadata_size);
 }
@@ -255,11 +248,12 @@ Q* HuffmanDecode(
     int          dict_size)
 {
     auto type_bw             = sizeof(H) * 8;
-    auto canonical_meta      = sizeof(int) * (2 * type_bw) + sizeof(Q) * dict_size;
-    auto canonical_singleton = io::ReadBinaryFile<uint8_t>(f_bcode_base + ".cHcb", canonical_meta);
+    auto canonical_meta      = sizeof(H) * (2 * type_bw) + sizeof(Q) * dict_size;
+    auto canonical_singleton = io::ReadBinaryFile<uint8_t>(f_bcode_base + ".canon", canonical_meta);
+    cudaDeviceSynchronize();
 
     auto n_chunk  = (len - 1) / chunk_size + 1;
-    auto hcode    = io::ReadBinaryFile<H>(f_bcode_base + ".dh", total_uInts);
+    auto hcode    = io::ReadBinaryFile<H>(f_bcode_base + ".hbyte", total_uInts);
     auto dH_meta  = io::ReadBinaryFile<size_t>(f_bcode_base + ".hmeta", 2 * n_chunk);
     auto blockDim = tBLK_DEFLATE;  // the same as deflating
     auto gridDim  = (n_chunk - 1) / blockDim + 1;
@@ -268,6 +262,7 @@ Q* HuffmanDecode(
     auto d_dHcode              = mem::CreateDeviceSpaceAndMemcpyFromHost(hcode, total_uInts);
     auto d_hcode_meta          = mem::CreateDeviceSpaceAndMemcpyFromHost(dH_meta, 2 * n_chunk);
     auto d_canonical_singleton = mem::CreateDeviceSpaceAndMemcpyFromHost(canonical_singleton, canonical_meta);
+    cudaDeviceSynchronize();
 
     Decode<<<gridDim, blockDim, canonical_meta>>>(  //
         d_dHcode, d_hcode_meta, d_xbcode, len, chunk_size, n_chunk, d_canonical_singleton, (size_t)canonical_meta);
@@ -280,27 +275,29 @@ Q* HuffmanDecode(
     cudaFree(d_canonical_singleton);
     delete[] hcode;
     delete[] dH_meta;
+    delete[] canonical_singleton;
 
     return xbcode;
 }
 
-template void wrapper::GetFrequency<uint8_t>(uint8_t* d_bcode, size_t len, unsigned int* d_freq, int dict_size);
-template void wrapper::GetFrequency<uint16_t>(uint16_t* d_bcode, size_t len, unsigned int* d_freq, int dict_size);
-template void wrapper::GetFrequency<uint32_t>(uint32_t* d_bcode, size_t len, unsigned int* d_freq, int dict_size);
+template void wrapper::GetFrequency<uint8__t>(uint8__t*, size_t, unsigned int*, int);
+template void wrapper::GetFrequency<uint16_t>(uint16_t*, size_t, unsigned int*, int);
+template void wrapper::GetFrequency<uint32_t>(uint32_t*, size_t, unsigned int*, int);
 
 template void PrintChunkHuffmanCoding<uint32_t>(size_t*, size_t*, size_t, int, size_t, size_t);
 template void PrintChunkHuffmanCoding<uint64_t>(size_t*, size_t*, size_t, int, size_t, size_t);
 
-template tuple3ul HuffmanEncode<uint8_t, uint32_t, float>(string&, uint8_t*, size_t, int, int);
+template tuple3ul HuffmanEncode<uint8__t, uint32_t, float>(string&, uint8__t*, size_t, int, int);
 template tuple3ul HuffmanEncode<uint16_t, uint32_t, float>(string&, uint16_t*, size_t, int, int);
 template tuple3ul HuffmanEncode<uint32_t, uint32_t, float>(string&, uint32_t*, size_t, int, int);
-template tuple3ul HuffmanEncode<uint8_t, uint64_t, float>(string&, uint8_t*, size_t, int, int);
+template tuple3ul HuffmanEncode<uint8__t, uint64_t, float>(string&, uint8__t*, size_t, int, int);
 template tuple3ul HuffmanEncode<uint16_t, uint64_t, float>(string&, uint16_t*, size_t, int, int);
 template tuple3ul HuffmanEncode<uint32_t, uint64_t, float>(string&, uint32_t*, size_t, int, int);
 
-template uint8_t*  HuffmanDecode<uint8_t, uint32_t, float>(std::string&, size_t, int, int, int);
+template uint8__t* HuffmanDecode<uint8__t, uint32_t, float>(std::string&, size_t, int, int, int);
 template uint16_t* HuffmanDecode<uint16_t, uint32_t, float>(std::string&, size_t, int, int, int);
 template uint32_t* HuffmanDecode<uint32_t, uint32_t, float>(std::string&, size_t, int, int, int);
-template uint8_t*  HuffmanDecode<uint8_t, uint64_t, float>(std::string&, size_t, int, int, int);
+template uint8__t* HuffmanDecode<uint8__t, uint64_t, float>(std::string&, size_t, int, int, int);
 template uint16_t* HuffmanDecode<uint16_t, uint64_t, float>(std::string&, size_t, int, int, int);
 template uint32_t* HuffmanDecode<uint32_t, uint64_t, float>(std::string&, size_t, int, int, int);
+// clang-format off
