@@ -13,6 +13,7 @@
  *
  */
 
+#include <sys/types.h>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -588,10 +589,18 @@ void ParGetCodebook(int dict_size, unsigned int* _d_freq, H* _d_codebook, uint8_
 #endif
 }
 
+using uint8__t = uint8_t;
+using ulli     = unsigned long long int;
+
 // Specialize wrapper
-template void ParGetCodebook<uint8_t, uint32_t>(int dict_size, unsigned int* freq, uint32_t* codebook, uint8_t* meta);
-template void ParGetCodebook<uint8_t, uint64_t>(int dict_size, unsigned int* freq, uint64_t* codebook, uint8_t* meta);
-template void ParGetCodebook<uint16_t, uint32_t>(int dict_size, unsigned int* freq, uint32_t* codebook, uint8_t* meta);
-template void ParGetCodebook<uint16_t, uint64_t>(int dict_size, unsigned int* freq, uint64_t* codebook, uint8_t* meta);
-template void ParGetCodebook<uint32_t, uint32_t>(int dict_size, unsigned int* freq, uint32_t* codebook, uint8_t* meta);
-template void ParGetCodebook<uint32_t, uint64_t>(int dict_size, unsigned int* freq, uint64_t* codebook, uint8_t* meta);
+template void ParGetCodebook<uint8__t, uint32_t>(int, unsigned int*, uint32_t*, uint8_t*);
+template void ParGetCodebook<uint16_t, uint32_t>(int, unsigned int*, uint32_t*, uint8_t*);
+template void ParGetCodebook<uint8__t, uint64_t>(int, unsigned int*, uint64_t*, uint8_t*);
+template void ParGetCodebook<uint16_t, uint64_t>(int, unsigned int*, uint64_t*, uint8_t*);
+template void ParGetCodebook<uint8__t, ulli>(int, unsigned int*, ulli*, uint8_t*);
+template void ParGetCodebook<uint16_t, ulli>(int, unsigned int*, ulli*, uint8_t*);
+
+// deprecated: we don't use uint32_t for quant code
+// template void ParGetCodebook<uint32_t, uint32_t>(int dict_size, unsigned int* freq, uint32_t* codebook, uint8_t*
+// meta); template void ParGetCodebook<uint32_t, uint64_t>(int dict_size, unsigned int* freq, uint64_t* codebook,
+// uint8_t* meta);

@@ -1,0 +1,14 @@
+for mag in 12 11 10; do
+	echo "mag = ${mag}"
+	for red in 4 3 2; do
+	    echo "red= ${red}"
+		for i in `seq 1 8`; do
+			nvprof --log-file ${mag}-${red}.txt ./huffre ${mag} ${red} \
+				>> /dev/null && cat ${mag}-${red}.txt \
+				| grep ReduceShuffle_fixcodebook \
+				| awk '{print $2}'
+		done
+		echo ""
+	done
+	echo ""
+done

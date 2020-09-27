@@ -19,8 +19,8 @@
 template <typename Q, typename H>
 __global__ void EncodeFixedLen(Q*, H*, size_t, H*);
 
-template <typename Q>
-__global__ void Deflate(Q*, size_t, size_t*, int);
+template <typename Q, typename TempSizeT = size_t>
+__global__ void Deflate(Q*, size_t, TempSizeT*, int);
 
 template <typename H, typename T>
 __device__ void InflateChunkwise(H*, T*, size_t, uint8_t*);

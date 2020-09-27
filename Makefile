@@ -1,7 +1,6 @@
 #STRICT_CHECK=-Xcompiler -Wall
 #PTX_VERBOSE=-Xptxas -O3,-v
 
-
 #CXX       := clang++ -fPIE
 CXX       := g++
 NVCC      := nvcc
@@ -59,6 +58,8 @@ _DEPS_MEM  := $(SRC_DIR)/cuda_mem.o
 _DEPS_HIST := $(SRC_DIR)/histogram.o $(SRC_DIR)/huffman_workflow.o $(SRC_DIR)/format.o $(SRC_DIR)/canonical.o $(SRC_DIR)/huffman.o -rdc=true
 _DEPS_OLDENC := $(SRC_DIR)/huffman_codec.o $(SRC_DIR)/par_huffman.o $(SRC_DIR)/par_huffman_sortbyfreq.o $(SRC_DIR)/par_merge.o
 DEPS_HUFF := $(_DEPS_MEM) $(_DEPS_HIST) $(_DEPS_OLDENC) $(_DEPS_ARG)
+
+HUFF_DIR := src/huffre
 
 huff: $(HUFF_DIR)/huff.cu $(SRC_DIR)/argparse.cc
 	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huff.cu -o huff

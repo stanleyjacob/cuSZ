@@ -151,8 +151,8 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(string& f_in, Q* d_in, size_t l
 
     // --------------------------------
     // this is for internal evaluation, not in sz archive
-    // auto cb_dump = mem::CreateHostSpaceAndMemcpyFromDevice(d_canonical_cb, dict_size);
-    // io::WriteBinaryFile(cb_dump, dict_size, new string(f_in + ".canonized"));
+    auto cb_dump = mem::CreateHostSpaceAndMemcpyFromDevice(d_canonical_cb, dict_size);
+    io::WriteArrayToBinary(string(f_in + ".dict"), cb_dump, dict_size);
     // --------------------------------
 
     // fix-length space
@@ -280,24 +280,34 @@ Q* HuffmanDecode(
     return xbcode;
 }
 
+using ulli = unsigned long long int;
+
 template void wrapper::GetFrequency<uint8__t>(uint8__t*, size_t, unsigned int*, int);
 template void wrapper::GetFrequency<uint16_t>(uint16_t*, size_t, unsigned int*, int);
-template void wrapper::GetFrequency<uint32_t>(uint32_t*, size_t, unsigned int*, int);
+// template void wrapper::GetFrequency<uint32_t>(uint32_t*, size_t, unsigned int*, int);
 
 template void PrintChunkHuffmanCoding<uint32_t>(size_t*, size_t*, size_t, int, size_t, size_t);
 template void PrintChunkHuffmanCoding<uint64_t>(size_t*, size_t*, size_t, int, size_t, size_t);
+template void PrintChunkHuffmanCoding<ulli>(size_t*, size_t*, size_t, int, size_t, size_t);
 
 template tuple3ul HuffmanEncode<uint8__t, uint32_t, float>(string&, uint8__t*, size_t, int, int);
-template tuple3ul HuffmanEncode<uint16_t, uint32_t, float>(string&, uint16_t*, size_t, int, int);
-template tuple3ul HuffmanEncode<uint32_t, uint32_t, float>(string&, uint32_t*, size_t, int, int);
 template tuple3ul HuffmanEncode<uint8__t, uint64_t, float>(string&, uint8__t*, size_t, int, int);
+template tuple3ul HuffmanEncode<uint16_t, uint32_t, float>(string&, uint16_t*, size_t, int, int);
 template tuple3ul HuffmanEncode<uint16_t, uint64_t, float>(string&, uint16_t*, size_t, int, int);
-template tuple3ul HuffmanEncode<uint32_t, uint64_t, float>(string&, uint32_t*, size_t, int, int);
+
+template tuple3ul HuffmanEncode<uint8__t, ulli, float>(string&, uint8__t*, size_t, int, int);
+template tuple3ul HuffmanEncode<uint16_t, ulli, float>(string&, uint16_t*, size_t, int, int);
+// template tuple3ul HuffmanEncode<uint32_t, uint32_t, float>(string&, uint32_t*, size_t, int, int);
+// template tuple3ul HuffmanEncode<uint32_t, uint64_t, float>(string&, uint32_t*, size_t, int, int);
 
 template uint8__t* HuffmanDecode<uint8__t, uint32_t, float>(std::string&, size_t, int, int, int);
-template uint16_t* HuffmanDecode<uint16_t, uint32_t, float>(std::string&, size_t, int, int, int);
-template uint32_t* HuffmanDecode<uint32_t, uint32_t, float>(std::string&, size_t, int, int, int);
 template uint8__t* HuffmanDecode<uint8__t, uint64_t, float>(std::string&, size_t, int, int, int);
+template uint16_t* HuffmanDecode<uint16_t, uint32_t, float>(std::string&, size_t, int, int, int);
 template uint16_t* HuffmanDecode<uint16_t, uint64_t, float>(std::string&, size_t, int, int, int);
-template uint32_t* HuffmanDecode<uint32_t, uint64_t, float>(std::string&, size_t, int, int, int);
+
+template uint8__t* HuffmanDecode<uint8__t, ulli, float>(std::string&, size_t, int, int, int);
+template uint16_t* HuffmanDecode<uint16_t, ulli, float>(std::string&, size_t, int, int, int);
+
+// template uint32_t* HuffmanDecode<uint32_t, uint32_t, float>(std::string&, size_t, int, int, int);
+// template uint32_t* HuffmanDecode<uint32_t, uint64_t, float>(std::string&, size_t, int, int, int);
 // clang-format off

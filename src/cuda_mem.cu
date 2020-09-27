@@ -33,9 +33,7 @@ void mem::CopyBetweenSpaces(T* src, T* dst, size_t l, MemcpyDirection direct)
 {
     assert(src != nullptr);
     assert(dst != nullptr);
-    if (direct == h2d) {
-        cudaMemcpy(dst, src, sizeof(T) * l, cudaMemcpyHostToDevice);
-    }
+    if (direct == h2d) { cudaMemcpy(dst, src, sizeof(T) * l, cudaMemcpyHostToDevice); }
     else if (direct == d2h) {
         cudaMemcpy(dst, src, sizeof(T) * l, cudaMemcpyDeviceToHost);
     }
@@ -61,14 +59,20 @@ inline T* mem::CreateHostSpaceAndMemcpyFromDevice(T* d_var, size_t l)
     return var;
 }
 
+// unlike some using `using uint64_t = unsigned long long int`, rename (U)LL type
+using ulli = unsigned long long int;
+using lli  = long long int;
+
 template uint8_t*  mem::CreateCUDASpace<uint8_t>(size_t l, uint8_t i);
 template uint16_t* mem::CreateCUDASpace<uint16_t>(size_t l, uint8_t i);
 template uint32_t* mem::CreateCUDASpace<uint32_t>(size_t l, uint8_t i);
 template uint64_t* mem::CreateCUDASpace<uint64_t>(size_t l, uint8_t i);
+template ulli*     mem::CreateCUDASpace<ulli>(size_t l, uint8_t i);
 template int8_t*   mem::CreateCUDASpace<int8_t>(size_t l, uint8_t i);
 template int16_t*  mem::CreateCUDASpace<int16_t>(size_t l, uint8_t i);
 template int32_t*  mem::CreateCUDASpace<int32_t>(size_t l, uint8_t i);
 template int64_t*  mem::CreateCUDASpace<int64_t>(size_t l, uint8_t i);
+template lli*      mem::CreateCUDASpace<lli>(size_t l, uint8_t i);
 template float*    mem::CreateCUDASpace<float>(size_t l, uint8_t i);
 template double*   mem::CreateCUDASpace<double>(size_t l, uint8_t i);
 
@@ -76,10 +80,12 @@ template int8_t*   mem::CreateDeviceSpaceAndMemcpyFromHost(int8_t* var, size_t l
 template int16_t*  mem::CreateDeviceSpaceAndMemcpyFromHost(int16_t* var, size_t l);
 template int32_t*  mem::CreateDeviceSpaceAndMemcpyFromHost(int32_t* var, size_t l);
 template int64_t*  mem::CreateDeviceSpaceAndMemcpyFromHost(int64_t* var, size_t l);
+template lli*      mem::CreateDeviceSpaceAndMemcpyFromHost(lli* var, size_t l);
 template uint8_t*  mem::CreateDeviceSpaceAndMemcpyFromHost(uint8_t* var, size_t l);
 template uint16_t* mem::CreateDeviceSpaceAndMemcpyFromHost(uint16_t* var, size_t l);
 template uint32_t* mem::CreateDeviceSpaceAndMemcpyFromHost(uint32_t* var, size_t l);
 template uint64_t* mem::CreateDeviceSpaceAndMemcpyFromHost(uint64_t* var, size_t l);
+template ulli*     mem::CreateDeviceSpaceAndMemcpyFromHost(ulli* var, size_t l);
 template float*    mem::CreateDeviceSpaceAndMemcpyFromHost(float* var, size_t l);
 template double*   mem::CreateDeviceSpaceAndMemcpyFromHost(double* var, size_t l);
 
@@ -87,9 +93,11 @@ template int8_t*   mem::CreateHostSpaceAndMemcpyFromDevice(int8_t* d_var, size_t
 template int16_t*  mem::CreateHostSpaceAndMemcpyFromDevice(int16_t* d_var, size_t l);
 template int32_t*  mem::CreateHostSpaceAndMemcpyFromDevice(int32_t* d_var, size_t l);
 template int64_t*  mem::CreateHostSpaceAndMemcpyFromDevice(int64_t* d_var, size_t l);
+template lli*      mem::CreateHostSpaceAndMemcpyFromDevice(lli* d_var, size_t l);
 template uint8_t*  mem::CreateHostSpaceAndMemcpyFromDevice(uint8_t* d_var, size_t l);
 template uint16_t* mem::CreateHostSpaceAndMemcpyFromDevice(uint16_t* d_var, size_t l);
 template uint32_t* mem::CreateHostSpaceAndMemcpyFromDevice(uint32_t* d_var, size_t l);
 template uint64_t* mem::CreateHostSpaceAndMemcpyFromDevice(uint64_t* d_var, size_t l);
+template ulli*     mem::CreateHostSpaceAndMemcpyFromDevice(ulli* d_var, size_t l);
 template float*    mem::CreateHostSpaceAndMemcpyFromDevice(float* d_var, size_t l);
 template double*   mem::CreateHostSpaceAndMemcpyFromDevice(double* d_var, size_t l);
