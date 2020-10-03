@@ -80,7 +80,7 @@ int main(int argc, char** argv)
         // eb_config->debug();
         eb_array = InitializeErrorBoundFamily(eb_config);
 
-        cout << log_dbg << "\e[1muint" << ap->quant_rep << "_t\e[0m to represent quant. code, \e[1muint"
+        cout << log_info << "\e[1muint" << ap->quant_rep << "_t\e[0m to represent quant. code, \e[1muint"
              << ap->huffman_rep << "_t\e[0m internal Huffman bitstream" << endl;
     }
 

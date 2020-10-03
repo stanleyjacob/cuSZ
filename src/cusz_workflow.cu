@@ -37,6 +37,7 @@
 #include "gather_scatter.cuh"
 #include "huffman_workflow.cuh"
 #include "io.hh"
+#include "timer.hh"
 #include "verify.hh"
 
 using std::cerr;
@@ -56,30 +57,20 @@ __constant__ double symb_ebs[4];
 typedef std::tuple<size_t, size_t, size_t> tuple3ul;
 
 template <typename T, typename Q>
-void cusz::impl::PdQ(T* d_data, Q* d_bcode, size_t* dims_L16, double* ebs_L4)
+void cusz::impl::PdQ(T* d_data, Q* d_bcode, size_t* dims_L16, double* ebs_L4, argpack* ap)
 {
     auto  d_dims_L16 = mem::CreateDeviceSpaceAndMemcpyFromHost(dims_L16, 16);
     auto  d_ebs_L4   = mem::CreateDeviceSpaceAndMemcpyFromHost(ebs_L4, 4);
     void* args[]     = {&d_data, &d_bcode, &d_dims_L16, &d_ebs_L4};
 
-    // testing constant memory
-    auto dims_inttype = new int[16];
-    for (auto i = 0; i < 16; i++) dims_inttype[i] = dims_L16[i];
-    cudaMemcpyToSymbol(symb_dims, dims_inttype, 16 * sizeof(int), 0, cudaMemcpyHostToDevice);
-    cudaMemcpyToSymbol(symb_ebs, ebs_L4, 4 * sizeof(double), 0, cudaMemcpyHostToDevice);
-    // void* args2[] = {&d_data, &d_bcode}; unreferenced
-
+    /*timer*/ ap->cusz_events.push_back(new Event("Dual-Quant kernel"));
+    /*timer*/ ap->cusz_events.back()->Start();
     if (dims_L16[nDIM] == 1) {
         dim3 blockNum(dims_L16[nBLK0]);
         dim3 threadNum(gpu_B_1d);
         cudaLaunchKernel(
             (void*)cusz::PdQ::c_lorenzo_1d1l<T, Q, gpu_B_1d>,  //
             blockNum, threadNum, args, 0, nullptr);
-        /*
-        cudaLaunchKernel(
-            (void*)cusz::PdQ::c_lorenzo_1d1l<T, Q, gpu_B_1d>,  //
-            blockNum, threadNum, args2, gpu_B_1d * sizeof(T), nullptr);
-        */
     }
     else if (dims_L16[nDIM] == 2) {
         dim3 blockNum(dims_L16[nBLK0], dims_L16[nBLK1]);
@@ -87,11 +78,6 @@ void cusz::impl::PdQ(T* d_data, Q* d_bcode, size_t* dims_L16, double* ebs_L4)
         cudaLaunchKernel(
             (void*)cusz::PdQ::c_lorenzo_2d1l<T, Q, gpu_B_2d>,  //
             blockNum, threadNum, args, (gpu_B_2d + 1) * (gpu_B_2d + 1) * sizeof(T), nullptr);
-        /*
-        cudaLaunchKernel(
-            (void*)cusz::PdQ::c_lorenzo_2d1l<T, Q, gpu_B_2d>,  //
-            blockNum, threadNum, args2, (gpu_B_2d) * (gpu_B_2d) * sizeof(T), nullptr);
-        */
     }
     else if (dims_L16[nDIM] == 3) {
         dim3 blockNum(dims_L16[nBLK0], dims_L16[nBLK1], dims_L16[nBLK2]);
@@ -99,31 +85,26 @@ void cusz::impl::PdQ(T* d_data, Q* d_bcode, size_t* dims_L16, double* ebs_L4)
         cudaLaunchKernel(
             (void*)cusz::PdQ::c_lorenzo_3d1l<T, Q, gpu_B_3d>,  //
             blockNum, threadNum, args, (gpu_B_3d + 1) * (gpu_B_3d + 1) * (gpu_B_3d + 1) * sizeof(T), nullptr);
-        /*
-        cudaLaunchKernel(
-            (void*)cusz::PdQ::c_lorenzo_3d1l_new<T, Q, gpu_B_3d>,  //
-            blockNum, threadNum, args2, (gpu_B_3d + 1) * (gpu_B_3d + 1) * (gpu_B_3d + 1) * sizeof(T), nullptr);
-        cudaLaunchKernel(
-            (void*)cusz::PdQ::c_lorenzo_3d1l<T, Q, gpu_B_3d>,  //
-            blockNum, threadNum, args2, (gpu_B_3d) * (gpu_B_3d) * (gpu_B_3d) * sizeof(T), nullptr);
-        */
     }
     HANDLE_ERROR(cudaDeviceSynchronize());
+    /*timer*/ ap->cusz_events.back()->End();
 }
 
-template void cusz::impl::PdQ<float, uint8__t>(float* d_data, uint8__t* d_bcode, size_t* dims_L16, double* ebs_L4);
-template void cusz::impl::PdQ<float, uint16_t>(float* d_data, uint16_t* d_bcode, size_t* dims_L16, double* ebs_L4);
-template void cusz::impl::PdQ<float, uint32_t>(float* d_data, uint32_t* d_bcode, size_t* dims_L16, double* ebs_L4);
-// template void cusz::impl::PdQ<double, uint8__t>(double* d_data, uint8__t* d_bcode, size_t* dims_L16, double* ebs_L4);
-// template void cusz::impl::PdQ<double, uint16_t>(double* d_data, uint16_t* d_bcode, size_t* dims_L16, double* ebs_L4);
-// template void cusz::impl::PdQ<double, uint32_t>(double* d_data, uint32_t* d_bcode, size_t* dims_L16, double* ebs_L4);
+template void cusz::impl::PdQ<float, uint8__t>(float*, uint8__t*, size_t*, double*, argpack*);
+template void cusz::impl::PdQ<float, uint16_t>(float*, uint16_t*, size_t*, double*, argpack*);
+template void cusz::impl::PdQ<float, uint32_t>(float*, uint32_t*, size_t*, double*, argpack*);
+// template void cusz::impl::PdQ<double, uint8__t>(double*, uint8__t*, size_t*, double*, argpack*);
+// template void cusz::impl::PdQ<double, uint16_t>(double*, uint16_t*, size_t*, double*, argpack*);
+// template void cusz::impl::PdQ<double, uint32_t>(double*, uint32_t*, size_t*, double*, argpack*);
 
 template <typename T, typename Q>
-void cusz::impl::ReversedPdQ(T* d_xdata, Q* d_bcode, T* d_outlier, size_t* dims_L16, double _2eb)
+void cusz::impl::ReversedPdQ(T* d_xdata, Q* d_bcode, T* d_outlier, size_t* dims_L16, double _2eb, argpack* ap)
 {
     auto  d_dims_L16 = mem::CreateDeviceSpaceAndMemcpyFromHost(dims_L16, 16);
     void* args[]     = {&d_xdata, &d_outlier, &d_bcode, &d_dims_L16, &_2eb};
 
+    /*timer*/ ap->cusz_events.push_back(new Event("Reversed Dual-Quant"));
+    /*timer*/ ap->cusz_events.back()->Start();
     if (dims_L16[nDIM] == 1) {
         const static size_t p = gpu_B_1d;
 
@@ -156,6 +137,7 @@ void cusz::impl::ReversedPdQ(T* d_xdata, Q* d_bcode, T* d_outlier, size_t* dims_
         cerr << log_err << "no 4D" << endl;
     }
     cudaDeviceSynchronize();
+    /*timer*/ ap->cusz_events.back()->End();
 
     cudaFree(d_dims_L16);
 }
@@ -167,7 +149,8 @@ void cusz::impl::VerifyHuffman(
     Q*            xbcode,
     int           chunk_size,
     size_t*       dims_L16,
-    double*       ebs_L4)
+    double*       ebs_L4,
+    argpack*      ap)
 {
     // TODO error handling from invalid read
     cout << log_info << "Redo PdQ just to get quantization dump." << endl;
@@ -175,7 +158,7 @@ void cusz::impl::VerifyHuffman(
     auto veri_data    = io::ReadBinaryFile<T>(fi, len);
     T*   veri_d_data  = mem::CreateDeviceSpaceAndMemcpyFromHost(veri_data, len);
     auto veri_d_bcode = mem::CreateCUDASpace<Q>(len);
-    PdQ(veri_d_data, veri_d_bcode, dims_L16, ebs_L4);
+    PdQ(veri_d_data, veri_d_bcode, dims_L16, ebs_L4, ap);
 
     auto veri_bcode = mem::CreateHostSpaceAndMemcpyFromDevice(veri_d_bcode, len);
 
@@ -235,23 +218,19 @@ void cusz::workflow::Compress(
     size_t&  n_uInt,
     size_t&  huffman_metadata_size)
 {
-    // int bw = sizeof(Q) * 8;
-    // string fo_cdata   = ap->opath + "/" + fi + ".sza";
-    // string fo_base    = ap->cx_path2file.substr(ap->cx_path2file.rfind("/") + 1);  // token is "scott"
-    // string fo_bcode   = ap->opath + fo_base + ".b" + std::to_string(bw);
-    // string fo_outlier = ap->opath + fo_base + ".b" + std::to_string(bw) + ".outlier";
-    // cout << fo_outlier << endl;
-
     // TODO to use a struct
     size_t len = dims_L16[LEN];
     auto   m   = cusz::impl::GetEdgeOfReinterpretedSquare(len);  // row-major mxn matrix
     auto   mxm = m * m;
 
-    cout << log_dbg << "original len: " << len << ", m the padded: " << m << ", mxm: " << mxm << endl;
+    // cout << log_dbg << "original len: " << len << ", m the padded: " << m << ", mxm: " << mxm << endl;
 
+    /*timer*/ ap->cusz_events.push_back(new Event("Read Input Data"));
+    /*timer*/ ap->cusz_events.back()->Start();
     auto data = new T[mxm]();
     io::ReadBinaryFile<T>(ap->cx_path2file, data, len);
     T* d_data = mem::CreateDeviceSpaceAndMemcpyFromHost(data, mxm);
+    /*timer*/ ap->cusz_events.back()->End();
 
     if (ap->to_dryrun) {
         cout << "\n" << log_info << "Commencing dry-run..." << endl;
@@ -263,8 +242,12 @@ void cusz::workflow::Compress(
     auto d_bcode = mem::CreateCUDASpace<Q>(len);  // quant. code is not needed for dry-run
 
     // prediction-quantization
-    ::cusz::impl::PdQ(d_data, d_bcode, dims_L16, ebs_L4);
+    ::cusz::impl::PdQ(d_data, d_bcode, dims_L16, ebs_L4, ap);
+
+    /*timer*/ ap->cusz_events.push_back(new Event("Prune-Gather Outliers (end-to-end)"));
+    /*timer*/ ap->cusz_events.back()->Start();
     ::cusz::impl::PruneGatherAsCSR(d_data, mxm, m /*lda*/, m /*m*/, m /*n*/, nnz_outlier, &ap->c_fo_outlier);
+    /*timer*/ ap->cusz_events.back()->End();
     cout << log_info << "nnz.outlier:\t" << nnz_outlier << "\t(" << (nnz_outlier / 1.0 / len * 100) << "%)" << endl;
 
     Q* bcode;
@@ -276,9 +259,16 @@ void cusz::workflow::Compress(
     }
 
     std::tie(n_bits, n_uInt, huffman_metadata_size) =
-        HuffmanEncode<Q, H>(ap->c_huff_base, d_bcode, len, ap->huffman_chunk, dims_L16[CAP]);
+        HuffmanEncode<Q, H>(ap, d_bcode, len, ap->huffman_chunk, dims_L16[CAP]);
 
-    cout << log_info << "Compression finished, saved Huffman encoded quant.code.\n" << endl;
+    cout << log_info << "Compression finished, saved Huffman encoded quant.code.\n\n";
+
+    // timer summary
+    for (auto& i : ap->cusz_events) i->TimeElapsed(len * 4);
+    cout << endl;
+
+    for (auto& i : ap->cusz_events) delete i;
+    ap->cusz_events.clear();
 
     delete[] data;
     cudaFree(d_data);
@@ -309,7 +299,7 @@ void cusz::workflow::Decompress(
     }
     else {
         cout << log_info << "Huffman decoding into quant.code." << endl;
-        xbcode = HuffmanDecode<Q, H>(ap->cx_path2file, len, ap->huffman_chunk, total_uInt, dict_size);
+        xbcode = HuffmanDecode<Q, H>(ap, len, ap->huffman_chunk, total_uInt, dict_size);
         if (ap->verify_huffman) {
             // TODO check in argpack
             if (ap->x_fi_origin == "") {
@@ -317,17 +307,21 @@ void cusz::workflow::Decompress(
                 exit(-1);
             }
             cout << log_info << "Verifying Huffman codec..." << endl;
-            ::cusz::impl::VerifyHuffman<T, Q>(ap->x_fi_origin, len, xbcode, ap->huffman_chunk, dims_L16, ebs_L4);
+            ::cusz::impl::VerifyHuffman<T, Q>(ap->x_fi_origin, len, xbcode, ap->huffman_chunk, dims_L16, ebs_L4, ap);
         }
     }
     auto d_bcode = mem::CreateDeviceSpaceAndMemcpyFromHost(xbcode, len);
 
     auto d_outlier = mem::CreateCUDASpace<T>(mxm);
+
+    /*timer*/ ap->cusz_events.push_back(new Event("Scatter Outliers"));
+    /*timer*/ ap->cusz_events.back()->Start();
     ::cusz::impl::ScatterFromCSR<T>(d_outlier, mxm, m /*lda*/, m /*m*/, m /*n*/, &nnz_outlier, &ap->x_fi_outlier);
+    /*timer*/ ap->cusz_events.back()->End();
 
     // TODO merge d_outlier and d_data
     auto d_xdata = mem::CreateCUDASpace<T>(len);
-    ::cusz::impl::ReversedPdQ(d_xdata, d_bcode, d_outlier, dims_L16, ebs_L4[EBx2]);
+    ::cusz::impl::ReversedPdQ(d_xdata, d_bcode, d_outlier, dims_L16, ebs_L4[EBx2], ap);
     auto xdata = mem::CreateHostSpaceAndMemcpyFromDevice(d_xdata, len);
 
     cout << log_info << "Decompression finished.\n\n";
@@ -388,6 +382,14 @@ void cusz::workflow::Decompress(
     else {
         cout << log_info << "Skipped writing unzipped to filesystem." << endl;
     }
+
+    cout << log_info << "Decompression finished.\n\n";
+
+    for (auto& i : ap->cusz_events) i->TimeElapsed(len * 4);
+    cout << endl;
+
+    for (auto& i : ap->cusz_events) delete i;
+    ap->cusz_events.clear();
 
     // clean up
     if (odata) delete[] odata;

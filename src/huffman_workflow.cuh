@@ -65,9 +65,9 @@ void PrintChunkHuffmanCoding(
 typedef std::tuple<size_t, size_t, size_t> tuple3ul;
 
 template <typename Q, typename H, typename DATA = float>
-tuple3ul HuffmanEncode(string& f_bcode, Q* d_bcode, size_t len, int chunk_size, int dict_size = 1024);
+tuple3ul HuffmanEncode(argpack* ap, Q* d_bcode, size_t len, int chunk_size, int dict_size = 1024);
 
 template <typename Q, typename H, typename DATA = float>
-Q* HuffmanDecode(std::string& f_bcode_base, size_t len, int chunk_size, int total_uInts, int dict_size = 1024);
+Q* HuffmanDecode(argpack* ap, size_t len, int chunk_size, int total_uInts, int dict_size = 1024);
 
 #endif

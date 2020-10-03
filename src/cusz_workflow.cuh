@@ -15,6 +15,8 @@
  */
 
 #include <iostream>
+#include <vector>
+
 #include "argparse.hh"
 
 using namespace std;
