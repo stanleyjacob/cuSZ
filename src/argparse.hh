@@ -18,7 +18,10 @@
 #include <iostream>
 #include <regex>
 #include <string>
+#include <vector>
+
 #include "format.hh"
+#include "timer.hh"
 
 using std::string;
 
@@ -51,6 +54,8 @@ typedef struct ArgPack {
     bool   verify_huffman;
     bool   skip_huffman, skip_writex;
     bool   pre_binning;
+
+    std::vector<Event*> cusz_events;
 
     int  input_rep;        // for standalone huffman
     int  huffman_datalen;  // for standalone huffman
