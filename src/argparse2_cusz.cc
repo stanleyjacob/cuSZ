@@ -38,8 +38,8 @@ void cuszContext::parse(int argc, char** argv)
                     if (s == "--huff-chunk")goto HUFF_CHUNK;
                     if (s == "--verify")    goto VERIFY;
                     if (s == "--dict-size") goto DICT;
-                    if (s == "--eb" or //
-                        s == "--error-bound")goto ERROR_BOUND;
+                    if (s == "--error-bound" or
+                        s == "--eb")        goto ERROR_BOUND;
                     if (s == "--compress" or //
                         s == "--zip")       goto WF_Z;
                     if (s == "--decompress" or //

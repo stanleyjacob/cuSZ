@@ -14,9 +14,11 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "format.hh"
 #include "metadata.hh"
+#include "timer.hh"
 
 using std::cerr;
 using std::cout;
@@ -58,6 +60,8 @@ class ArgParser {
 
    public:
     bool wf_dryrun;
+
+    std::vector<Event*> events;
 
     ArgParser() {}
     ~ArgParser() {}
