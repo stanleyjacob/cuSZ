@@ -20,6 +20,21 @@ struct MetadataTrait<1> {
 };
 
 template <>
+struct MetadataTrait<11> {
+    typedef struct Metadata<64> metadata_t;
+};
+
+template <>
+struct MetadataTrait<21> {
+    typedef struct Metadata<64> metadata_t;
+};
+
+template <>
+struct MetadataTrait<31> {
+    typedef struct Metadata<128> metadata_t;
+};
+
+template <>
 struct MetadataTrait<2> {
     typedef struct Metadata<16> metadata_t;
 };
