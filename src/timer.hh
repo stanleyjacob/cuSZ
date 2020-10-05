@@ -53,24 +53,24 @@ class Event {
 
         if (single_unit) {
             printf(
-                "time elapsed (us):\t%14.4lf\tthroughput (GB/s):\t%10.3lf\t(%s)\n",  //
-                time_elapsed * 1e6,                                                  //
-                bytelen / time_elapsed / (1024 * 1024 * 1024),                       //
+                "time elapsed (us):\t%14.4lf\t|\tthroughput (GB/s):\t%10.3lf\t|\t%s\n",  //
+                time_elapsed * 1e6,                                                      //
+                bytelen / time_elapsed / (1024 * 1024 * 1024),                           //
                 event_name.c_str());
         }
         else {
             if (time_elapsed * 1e3 > 1) {  // > 1 ms
                 printf(
-                    "time elapsed (ms):\t%14.4lf\tthroughput (GB/s):\t%10.3lf\t(%s)\n",  //
-                    time_elapsed * 1e3,                                                  //
-                    bytelen / time_elapsed / (1024 * 1024 * 1024),                       //
+                    "time elapsed (ms):\t%14.4lf\t|\tthroughput (GB/s):\t%10.3lf\t|\t%s\n",  //
+                    time_elapsed * 1e3,                                                      //
+                    bytelen / time_elapsed / (1024 * 1024 * 1024),                           //
                     event_name.c_str());
             }
             else {
                 printf(
-                    "time elapsed (us):\t%14.4lf\tthroughput (GB/s):\t%10.3lf\t(%s)\n",  //
-                    time_elapsed * 1e6,                                                  //
-                    bytelen / time_elapsed / (1024 * 1024 * 1024),                       //
+                    "time elapsed (us):\t%14.4lf\t|\tthroughput (GB/s):\t%10.3lf\t|\t%s\n",  //
+                    time_elapsed * 1e6,                                                      //
+                    bytelen / time_elapsed / (1024 * 1024 * 1024),                           //
                     event_name.c_str());
             }
         }

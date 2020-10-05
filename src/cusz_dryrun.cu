@@ -13,6 +13,7 @@
 
 #include <iostream>
 #include <string>
+#include "argparse.hh"
 #include "cuda_mem.cuh"
 #include "cusz_dryrun.cuh"
 #include "cusz_dualquant.cuh"
@@ -80,13 +81,15 @@ __global__ void cusz::dryrun::lorenzo_3d1l(T* data, size_t* dims_L16, double* eb
 }
 
 template <typename T>
-void cusz::workflow::DryRun(T* d, T* d_d, string fi, size_t* dims, double* ebs)
+void cusz::workflow::DryRun(T* d, T* d_d, string fi, size_t* dims, double* ebs, argpack* ap)
 {
     cout << log_info << "Entering dry-run mode..." << endl;
     auto len        = dims[LEN];
     auto d_dims_L16 = mem::CreateDeviceSpaceAndMemcpyFromHost(dims, 16);
     auto d_ebs_L4   = mem::CreateDeviceSpaceAndMemcpyFromHost(ebs, 4);
 
+    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSY\tDRYRUN"));
+    /*timer*/ ap->cusz_events.back()->Start();
     if (dims[nDIM] == 1) {
         dim3 blockNum(dims[nBLK0]);
         dim3 threadNum(B_1d);
@@ -103,6 +106,8 @@ void cusz::workflow::DryRun(T* d, T* d_d, string fi, size_t* dims, double* ebs)
         cusz::dryrun::lorenzo_3d1l<T><<<blockNum, threadNum>>>(d_d, d_dims_L16, d_ebs_L4);
     }
     cudaDeviceSynchronize();
+    /*timer*/ ap->cusz_events.back()->End();
+
     cudaMemcpy(d, d_d, len * sizeof(T), cudaMemcpyDeviceToHost);
 
     auto d2 = io::ReadBinaryFile<T>(fi, len);
@@ -120,7 +125,7 @@ template __global__ void cusz::dryrun::lorenzo_1d1l<float>(float*, size_t*, doub
 template __global__ void cusz::dryrun::lorenzo_2d1l<float>(float*, size_t*, double*);
 template __global__ void cusz::dryrun::lorenzo_3d1l<float>(float*, size_t*, double*);
 
-template void cusz::workflow::DryRun<float>(float* d, float* d_d, string fi, size_t* dims, double* ebs);
+template void cusz::workflow::DryRun<float>(float*, float*, string, size_t*, double*, argpack*);
 /*
 template void cusz::workflow::DryRun<double>(double* d, double* d_d, string fi, size_t* dims, double* ebs);
 template void cusz::workflow::DryRun<char>(char* d, char* d_d, string fi, size_t* dims, double* ebs);

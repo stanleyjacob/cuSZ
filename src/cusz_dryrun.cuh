@@ -12,6 +12,7 @@
  */
 
 #include <string>
+#include "argparse.hh"
 
 namespace cusz {
 
@@ -30,7 +31,7 @@ __global__ void lorenzo_3d1l(T*, size_t*, double*);
 namespace workflow {
 
 template <typename T>
-void DryRun(T*, T*, std::string, size_t*, double*);
+void DryRun(T*, T*, std::string, size_t*, double*, argpack*);
 
 }
 }  // namespace cusz

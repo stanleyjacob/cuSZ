@@ -33,7 +33,8 @@ void PruneGatherAsCSR(
     const int    m,
     const int    n,
     int&         nnzC,
-    std::string* fo);
+    std::string* fo,
+    argpack*     ap);
 
 }  // namespace impl
 }  // namespace cusz

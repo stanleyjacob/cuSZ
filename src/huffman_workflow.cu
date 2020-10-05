@@ -132,7 +132,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
     ht_all_nodes = 2 * ht_state_num;
     auto d_freq  = mem::CreateCUDASpace<unsigned int>(ht_all_nodes);
 
-    /*timer*/ ap->cusz_events.push_back(new Event("Histogramming (end-to-end)"));
+    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSLESS\thistogramming (end-to-end)"));
     /*timer*/ ap->cusz_events.back()->Start();
     wrapper::GetFrequency(d_in, len, d_freq, dict_size);
     /*timer*/ ap->cusz_events.back()->End();
@@ -147,7 +147,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
     auto d_decode_meta    = mem::CreateCUDASpace<uint8_t>(decode_meta_size);
 
     // Get codebooks
-    /*timer*/ ap->cusz_events.push_back(new Event("Parallel-Get Codebook"));
+    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSLESS\tparallel-get codebook"));
     /*timer*/ ap->cusz_events.back()->Start();
     ParGetCodebook<Q, H>(dict_size, d_freq, d_canonical_cb, d_decode_meta);
     cudaDeviceSynchronize();
@@ -164,7 +164,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
     // io::WriteBinaryFile(cb_dump, dict_size, new string(f_in + ".canonized"));
     // --------------------------------
 
-    /*timer*/ ap->cusz_events.push_back(new Event("Query Space for Huffman-Deflate"));
+    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSLESS\tquery space for Hwffman-deflate"));
     /*timer*/ ap->cusz_events.back()->Start();
     // fix-length space
     {
@@ -181,7 +181,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
     // cout << log_dbg << "chunk.size:\t" << chunk_size << endl;
     // cout << log_dbg << "chunk.num:\t" << n_chunk << endl;
 
-    /*timer*/ ap->cusz_events.push_back(new Event("Huffman-Deflate"));
+    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSLESS\tHuffman-deflate"));
     /*timer*/ ap->cusz_events.back()->Start();
     {
         auto blockDim = tBLK_DEFLATE;
@@ -217,7 +217,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
     // print densely metadata
     // PrintChunkHuffmanCoding<H>(dH_bit_meta, dH_uInt_meta, len, chunk_size, total_bits, total_uInts);
 
-    /*timer*/ ap->cusz_events.push_back(new Event("Naive Gather Huffman-Bitstream over PCIe"));
+    /*timer*/ ap->cusz_events.push_back(new Event("PCIe   d2h\tnaive gather Huffman-bitstream"));
     /*timer*/ ap->cusz_events.back()->Start();
     // copy back densely Huffman code in units of uInt (regarding endianness)
     // TODO reinterpret_cast
@@ -231,6 +231,8 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
     }
     /*timer*/ ap->cusz_events.back()->End();
 
+    /*timer*/ ap->cusz_events.push_back(new Event("HOST   I/O\twrite Huffman bitstream and metadata"));
+    /*timer*/ ap->cusz_events.back()->Start();
     // dump bit_meta and uInt_meta
     io::WriteArrayToBinary(f_in + ".hmeta", h_meta + n_chunk, (2 * n_chunk));
     // write densely Huffman code and its metadata
@@ -241,6 +243,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
         reinterpret_cast<uint8_t*>(decode_meta),           //
         sizeof(H) * (2 * type_bw) + sizeof(Q) * dict_size  // first, entry, reversed dict (keys)
     );
+    /*timer*/ ap->cusz_events.back()->End();
 
     size_t metadata_size = (2 * n_chunk) * sizeof(decltype(h_meta))              //
                            + sizeof(H) * (2 * type_bw) + sizeof(Q) * dict_size;  // uint8_t
@@ -287,7 +290,7 @@ Q* HuffmanDecode(
     auto d_canonical_singleton = mem::CreateDeviceSpaceAndMemcpyFromHost(canonical_singleton, canonical_meta);
     cudaDeviceSynchronize();
 
-    /*timer*/ ap->cusz_events.push_back(new Event("Huffman Decode"));
+    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSLESS\tHuffman decode"));
     /*timer*/ ap->cusz_events.back()->Start();
     Decode<<<gridDim, blockDim, canonical_meta>>>(  //
         d_dHcode, d_hcode_meta, d_xbcode, len, chunk_size, n_chunk, d_canonical_singleton, (size_t)canonical_meta);

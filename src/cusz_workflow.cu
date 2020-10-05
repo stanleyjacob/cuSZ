@@ -63,7 +63,7 @@ void cusz::impl::PdQ(T* d_data, Q* d_bcode, size_t* dims_L16, double* ebs_L4, ar
     auto  d_ebs_L4   = mem::CreateDeviceSpaceAndMemcpyFromHost(ebs_L4, 4);
     void* args[]     = {&d_data, &d_bcode, &d_dims_L16, &d_ebs_L4};
 
-    /*timer*/ ap->cusz_events.push_back(new Event("Dual-Quant kernel"));
+    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSY\tdual-quant kernel"));
     /*timer*/ ap->cusz_events.back()->Start();
     if (dims_L16[nDIM] == 1) {
         dim3 blockNum(dims_L16[nBLK0]);
@@ -103,7 +103,7 @@ void cusz::impl::ReversedPdQ(T* d_xdata, Q* d_bcode, T* d_outlier, size_t* dims_
     auto  d_dims_L16 = mem::CreateDeviceSpaceAndMemcpyFromHost(dims_L16, 16);
     void* args[]     = {&d_xdata, &d_outlier, &d_bcode, &d_dims_L16, &_2eb};
 
-    /*timer*/ ap->cusz_events.push_back(new Event("Reversed Dual-Quant"));
+    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSY\treversed dual-quant"));
     /*timer*/ ap->cusz_events.back()->Start();
     if (dims_L16[nDIM] == 1) {
         const static size_t p = gpu_B_1d;
@@ -225,7 +225,7 @@ void cusz::workflow::Compress(
 
     // cout << log_dbg << "original len: " << len << ", m the padded: " << m << ", mxm: " << mxm << endl;
 
-    /*timer*/ ap->cusz_events.push_back(new Event("Read Input Data"));
+    /*timer*/ ap->cusz_events.push_back(new Event("HOST   I/O\tread input data"));
     /*timer*/ ap->cusz_events.back()->Start();
     auto data = new T[mxm]();
     io::ReadBinaryFile<T>(ap->cx_path2file, data, len);
@@ -234,34 +234,31 @@ void cusz::workflow::Compress(
 
     if (ap->to_dryrun) {
         cout << "\n" << log_info << "Commencing dry-run..." << endl;
-        DryRun(data, d_data, ap->cx_path2file, dims_L16, ebs_L4);
-        exit(0);
+        DryRun(data, d_data, ap->cx_path2file, dims_L16, ebs_L4, ap);
     }
-    cout << "\n" << log_info << "Commencing compression..." << endl;
+    else {
+        cout << "\n" << log_info << "Commencing compression..." << endl;
 
-    auto d_bcode = mem::CreateCUDASpace<Q>(len);  // quant. code is not needed for dry-run
+        auto d_bcode = mem::CreateCUDASpace<Q>(len);  // quant. code is not needed for dry-run
 
-    // prediction-quantization
-    ::cusz::impl::PdQ(d_data, d_bcode, dims_L16, ebs_L4, ap);
+        // prediction-quantization
+        cusz::impl::PdQ(d_data, d_bcode, dims_L16, ebs_L4, ap);
+        cusz::impl::PruneGatherAsCSR(d_data, mxm, m /*lda*/, m /*m*/, m /*n*/, nnz_outlier, &ap->c_fo_outlier, ap);
+        cout << log_info << "nnz.outlier:\t" << nnz_outlier << "\t(" << (nnz_outlier / 1.0 / len * 100) << "%)" << endl;
 
-    /*timer*/ ap->cusz_events.push_back(new Event("Prune-Gather Outliers (end-to-end)"));
-    /*timer*/ ap->cusz_events.back()->Start();
-    ::cusz::impl::PruneGatherAsCSR(d_data, mxm, m /*lda*/, m /*m*/, m /*n*/, nnz_outlier, &ap->c_fo_outlier);
-    /*timer*/ ap->cusz_events.back()->End();
-    cout << log_info << "nnz.outlier:\t" << nnz_outlier << "\t(" << (nnz_outlier / 1.0 / len * 100) << "%)" << endl;
+        Q* bcode;
+        if (ap->skip_huffman) {
+            bcode = mem::CreateHostSpaceAndMemcpyFromDevice(d_bcode, len);
+            io::WriteArrayToBinary(ap->c_fo_q, bcode, len);
+            cout << log_info << "Compression finished, saved quant.code (Huffman skipped).\n" << endl;
+            return;
+        }
 
-    Q* bcode;
-    if (ap->skip_huffman) {
-        bcode = mem::CreateHostSpaceAndMemcpyFromDevice(d_bcode, len);
-        io::WriteArrayToBinary(ap->c_fo_q, bcode, len);
-        cout << log_info << "Compression finished, saved quant.code (Huffman skipped).\n" << endl;
-        return;
+        std::tie(n_bits, n_uInt, huffman_metadata_size) =
+            HuffmanEncode<Q, H>(ap, d_bcode, len, ap->huffman_chunk, dims_L16[CAP]);
+
+        cout << log_info << "Compression finished, saved Huffman encoded quant.code.\n\n";
     }
-
-    std::tie(n_bits, n_uInt, huffman_metadata_size) =
-        HuffmanEncode<Q, H>(ap, d_bcode, len, ap->huffman_chunk, dims_L16[CAP]);
-
-    cout << log_info << "Compression finished, saved Huffman encoded quant.code.\n\n";
 
     // timer summary
     for (auto& i : ap->cusz_events) i->TimeElapsed(len * 4);
@@ -314,7 +311,7 @@ void cusz::workflow::Decompress(
 
     auto d_outlier = mem::CreateCUDASpace<T>(mxm);
 
-    /*timer*/ ap->cusz_events.push_back(new Event("Scatter Outliers"));
+    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSY\tscatter outliers"));
     /*timer*/ ap->cusz_events.back()->Start();
     ::cusz::impl::ScatterFromCSR<T>(d_outlier, mxm, m /*lda*/, m /*m*/, m /*n*/, &nnz_outlier, &ap->x_fi_outlier);
     /*timer*/ ap->cusz_events.back()->End();
