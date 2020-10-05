@@ -510,11 +510,7 @@ ArgPack::ArgPack(int argc, char** argv, bool huffman)
                 // ----------------------------------------------------------------
                 case 'i':
                 _INPUT_DATUM:
-<<<<<<< HEAD
-                    if (i + 1 <= argc) { fname = string(argv[++i]); }
-=======
                     if (i + 1 <= argc) { cx_path2file = string(argv[++i]); }
->>>>>>> master
                     break;
                 case 'R':
                 _REP:
@@ -773,14 +769,6 @@ ArgPack::ArgPack(int argc, char** argv)
                 // ----------------------------------------------------------------
                 case 'i':  // TODO integer under '-t'
                 _INPUT_DATUM:
-<<<<<<< HEAD
-                    if (i + 1 <= argc) { fname = string(argv[++i]); }
-                    break;
-                    // alternative output
-                case 'o':
-                _OUT:
-                    if (i + 1 <= argc) { alt_xout_name = string(argv[++i]); }
-=======
                     if (i + 1 <= argc) { cx_path2file = string(argv[++i]); }
                     break;
                     // alternative output
@@ -792,7 +780,6 @@ ArgPack::ArgPack(int argc, char** argv)
                          << endl;
                     exit(1);
                     // if (i + 1 <= argc) { alt_xout_name = string(argv[++i]); }
->>>>>>> master
                     break;
                 // preprocess
                 case 'p':
