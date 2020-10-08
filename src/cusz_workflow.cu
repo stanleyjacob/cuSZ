@@ -37,6 +37,7 @@
 #include "gather_scatter.cuh"
 #include "huffman_workflow.cuh"
 #include "io.hh"
+#include "timer.cuh"
 #include "timer.hh"
 #include "verify.hh"
 
@@ -56,6 +57,8 @@ __constant__ double symb_ebs[4];
 
 typedef std::tuple<size_t, size_t, size_t> tuple3ul;
 
+__global__ void DummyKernel() {}
+
 template <typename T, typename Q>
 void cusz::impl::PdQ(T* d_data, Q* d_bcode, size_t* dims_L16, double* ebs_L4, argpack* ap)
 {
@@ -63,8 +66,7 @@ void cusz::impl::PdQ(T* d_data, Q* d_bcode, size_t* dims_L16, double* ebs_L4, ar
     auto  d_ebs_L4   = mem::CreateDeviceSpaceAndMemcpyFromHost(ebs_L4, 4);
     void* args[]     = {&d_data, &d_bcode, &d_dims_L16, &d_ebs_L4};
 
-    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSY\tdual-quant kernel"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ auto de = new DeviceEvent("KERNEL LOSSY\tdual-quant kernel");
     if (dims_L16[nDIM] == 1) {
         dim3 blockNum(dims_L16[nBLK0]);
         dim3 threadNum(gpu_B_1d);
@@ -87,7 +89,8 @@ void cusz::impl::PdQ(T* d_data, Q* d_bcode, size_t* dims_L16, double* ebs_L4, ar
             blockNum, threadNum, args, (gpu_B_3d + 1) * (gpu_B_3d + 1) * (gpu_B_3d + 1) * sizeof(T), nullptr);
     }
     HANDLE_ERROR(cudaDeviceSynchronize());
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 }
 
 template void cusz::impl::PdQ<float, uint8__t>(float*, uint8__t*, size_t*, double*, argpack*);
@@ -103,8 +106,7 @@ void cusz::impl::ReversedPdQ(T* d_xdata, Q* d_bcode, T* d_outlier, size_t* dims_
     auto  d_dims_L16 = mem::CreateDeviceSpaceAndMemcpyFromHost(dims_L16, 16);
     void* args[]     = {&d_xdata, &d_outlier, &d_bcode, &d_dims_L16, &_2eb};
 
-    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSY\treversed dual-quant"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ auto de = new DeviceEvent("KERNEL LOSSY\treversed dual-quant");
     if (dims_L16[nDIM] == 1) {
         const static size_t p = gpu_B_1d;
 
@@ -137,7 +139,8 @@ void cusz::impl::ReversedPdQ(T* d_xdata, Q* d_bcode, T* d_outlier, size_t* dims_
         cerr << log_err << "no 4D" << endl;
     }
     cudaDeviceSynchronize();
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     cudaFree(d_dims_L16);
 }
@@ -225,12 +228,16 @@ void cusz::workflow::Compress(
 
     // cout << log_dbg << "original len: " << len << ", m the padded: " << m << ", mxm: " << mxm << endl;
 
-    /*timer*/ ap->cusz_events.push_back(new Event("HOST   I/O\tread input data"));
-    /*timer*/ ap->cusz_events.back()->Start();
-    auto data = new T[mxm]();
+    // DeviceEvent* de;
+    HostEvent* he;
+    // DeviceEvent* de;
+
+    /*timer*/ he = new HostEvent("HOST   I/O\tread input data");
+    auto data    = new T[mxm]();
     io::ReadBinaryFile<T>(ap->cx_path2file, data, len);
     T* d_data = mem::CreateDeviceSpaceAndMemcpyFromHost(data, mxm);
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({he->event_name, he->End()});
+    /*timer*/ delete he;
 
     if (ap->to_dryrun) {
         cout << "\n" << log_info << "Commencing dry-run..." << endl;
@@ -260,12 +267,46 @@ void cusz::workflow::Compress(
         cout << log_info << "Compression finished, saved Huffman encoded quant.code.\n\n";
     }
 
-    // timer summary
-    for (auto& i : ap->cusz_events) i->TimeElapsed(len * 4);
+    // /*timer*/ he = new HostEvent("fix     chrono; launch kernel");
+    // // for (auto i = 0; i < 10; i++)
+    // DummyKernel<<<1, 1>>>();
+    // /*timer*/ ap->cusz_events_ms.push_back({he->event_name, he->End()});
+    // /*timer*/ delete he;
+
+    // /*timer*/ he = new HostEvent("fix     chrono; launch kernel");
+    // // for (auto i = 0; i < 10; i++)
+    // DummyKernel<<<1, 1>>>();
+    // /*timer*/ ap->cusz_events_ms.push_back({he->event_name, he->End()});
+    // /*timer*/ delete he;
+
+    // /*timer*/ he = new HostEvent("fix     chrono; launch kernel");
+    // // for (auto i = 0; i < 10; i++)
+    // DummyKernel<<<1, 1>>>();
+    // /*timer*/ ap->cusz_events_ms.push_back({he->event_name, he->End()});
+    // /*timer*/ delete he;
+
+    // /*timer*/ he = new HostEvent("fix     chrono; launch kernel, large grid");
+    // // for (auto i = 0; i < 10; i++)
+    // DummyKernel<<<256 * 256, 256>>>();
+    // /*timer*/ ap->cusz_events_ms.push_back({he->event_name, he->End()});
+    // /*timer*/ delete he;
+
+    // /*timer*/ de = new DeviceEvent("fix     cudaEvent; launch kernel");
+    // // for (auto i = 0; i < 10; i++)
+    // DummyKernel<<<1, 1>>>();
+    // /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    // /*timer*/ delete de;
+
+    for (auto& i : ap->cusz_events_ms) {
+        printf(
+            "time elapsed (us):\t%14.4lf\t|\tthroughput (GB/s):\t%10.3lf\t|\t%s\n",  //
+            get<1>(i) * 1000,                                                        //
+            len * 4 / (get<1>(i) * 1e-3) / (1024 * 1024 * 1024),                     //
+            get<0>(i).c_str());
+    }
     cout << endl;
 
-    for (auto& i : ap->cusz_events) delete i;
-    ap->cusz_events.clear();
+    ap->cusz_events_ms.clear();
 
     delete[] data;
     cudaFree(d_data);
@@ -311,10 +352,12 @@ void cusz::workflow::Decompress(
 
     auto d_outlier = mem::CreateCUDASpace<T>(mxm);
 
-    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSY\tscatter outliers"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    DeviceEvent* de;
+
+    /*timer*/ de = new DeviceEvent("KERNEL LOSSY\tscatter outliers");
     ::cusz::impl::ScatterFromCSR<T>(d_outlier, mxm, m /*lda*/, m /*m*/, m /*n*/, &nnz_outlier, &ap->x_fi_outlier);
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     // TODO merge d_outlier and d_data
     auto d_xdata = mem::CreateCUDASpace<T>(len);
@@ -382,11 +425,14 @@ void cusz::workflow::Decompress(
 
     cout << log_info << "Decompression finished.\n\n";
 
-    for (auto& i : ap->cusz_events) i->TimeElapsed(len * 4);
+    for (auto& i : ap->cusz_events_ms) {
+        printf(
+            "time elapsed (us):\t%14.4lf\t|\tthroughput (GB/s):\t%10.3lf\t|\t%s\n",  //
+            get<1>(i) * 1000,                                                        //
+            len * 4 / (get<1>(i) * 1e-3) / (1024 * 1024 * 1024),                     //
+            get<0>(i).c_str());
+    }
     cout << endl;
-
-    for (auto& i : ap->cusz_events) delete i;
-    ap->cusz_events.clear();
 
     // clean up
     if (odata) delete[] odata;

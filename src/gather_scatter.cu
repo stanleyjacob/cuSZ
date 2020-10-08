@@ -24,6 +24,7 @@ using std::endl;
 #include "format.hh"
 #include "gather_scatter.cuh"
 #include "io.hh"
+#include "timer.cuh"
 
 using handle_t = cusparseHandle_t;
 using stream_t = cudaStream_t;
@@ -176,8 +177,9 @@ void cusz::impl::PruneGatherAsCSR(
     char*    d_work       = nullptr;
     float    threshold    = 0;
 
-    /*timer*/ ap->cusz_events.push_back(new Event("HOST   CONFIG\tcuSPARSE setup"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    DeviceEvent* de;
+
+    /*timer*/ de = new DeviceEvent("HOST   CONFIG\tcuSPARSE setup");
     // clang-format off
     CHECK_CUDA(cudaStreamCreateWithFlags   ( &stream, cudaStreamNonBlocking        )); // 1. create stream
     CHECK_CUSPARSE(cusparseCreate          ( &handle                               )); // 2. create handle
@@ -186,29 +188,27 @@ void cusz::impl::PruneGatherAsCSR(
     CHECK_CUSPARSE(cusparseSetMatIndexBase (  descr,  CUSPARSE_INDEX_BASE_ZERO     )); // zero based
     CHECK_CUSPARSE(cusparseSetMatType      (  descr,  CUSPARSE_MATRIX_TYPE_GENERAL )); // type
     // clang-format on
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     CHECK_CUDA(cudaMalloc((void**)&d_row_ptr, sizeof(int) * (m + 1)));
 
     // omit for now
-    // /*timer*/ ap->cusz_events.push_back(new Event("cuSPARSE buffer-size-ext"));
-    // /*timer*/ ap->cusz_events.back()->Start();
     CHECK_CUSPARSE(cusparseSpruneDense2csr_bufferSizeExt(  //
         handle, m, n, d_A, lda, &threshold, descr, d_csr_val, d_row_ptr, d_col_ind, &lworkInBytes));
-    // /*timer*/ ap->cusz_events.back()->End();
 
     // printf("lworkInBytes (prune) = %lld \n", (long long)lworkInBytes);
     if (nullptr != d_work) cudaFree(d_work);
 
     CHECK_CUDA(cudaMalloc((void**)&d_work, lworkInBytes));
 
-    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSY\tcuSPARSE compute row_ptr and nnz"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ de = new DeviceEvent("KERNEL LOSSY\tcuSPARSE compute row_ptr and nnz");
     /* step 4: compute row_ptrC and nnzC */
     CHECK_CUSPARSE(cusparseSpruneDense2csrNnz(  //
         handle, m, n, d_A, lda, &threshold, descr, d_row_ptr, &nnzC, d_work));
     CHECK_CUDA(cudaDeviceSynchronize());
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     if (0 == nnzC) cout << log_info << "No outlier." << endl;
 
@@ -216,12 +216,12 @@ void cusz::impl::PruneGatherAsCSR(
     CHECK_CUDA(cudaMalloc((void**)&d_col_ind, sizeof(int) * nnzC));
     CHECK_CUDA(cudaMalloc((void**)&d_csr_val, sizeof(float) * nnzC));
 
-    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSY\tcuSPARSE compute col_idx and csr_val"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ de = new DeviceEvent("KERNEL LOSSY\tcuSPARSE compute col_idx and csr_val");
     CHECK_CUSPARSE(cusparseSpruneDense2csr(  //
         handle, m, n, d_A, lda, &threshold, descr, d_csr_val, d_row_ptr, d_col_ind, d_work));
     CHECK_CUDA(cudaDeviceSynchronize());
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     /* step 6: output C */
     auto lrp    = sizeof(int) * (m + 1);
@@ -230,19 +230,19 @@ void cusz::impl::PruneGatherAsCSR(
     auto ltotal = lrp + lci + lv;
     auto outbin = new uint8_t[ltotal];
 
-    /*timer*/ ap->cusz_events.push_back(new Event("PCIe   d2h\tmemcpy csr to host"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ de = new DeviceEvent("PCIe   d2h\tmemcpy csr to host");
     // clang-format off
     CHECK_CUDA(cudaMemcpy(outbin,             d_row_ptr, lrp, cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaMemcpy(outbin + lrp,       d_col_ind, lci, cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaMemcpy(outbin + lrp + lci, d_csr_val, lv,  cudaMemcpyDeviceToHost));
     // clang-format on
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
-    /*timer*/ ap->cusz_events.push_back(new Event("HOST   I/O\twrite csr to filesystem"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ de = new DeviceEvent("HOST   I/O\twrite csr to filesystem");
     io::WriteArrayToBinary(*fo, outbin, ltotal);
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     if (d_A) cudaFree(d_A);
     if (d_row_ptr) cudaFree(d_row_ptr);

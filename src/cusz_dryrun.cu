@@ -19,6 +19,7 @@
 #include "cusz_dualquant.cuh"
 #include "format.hh"
 #include "io.hh"
+#include "timer.cuh"
 #include "verify.hh"
 
 using std::cerr;
@@ -88,8 +89,7 @@ void cusz::workflow::DryRun(T* d, T* d_d, string fi, size_t* dims, double* ebs, 
     auto d_dims_L16 = mem::CreateDeviceSpaceAndMemcpyFromHost(dims, 16);
     auto d_ebs_L4   = mem::CreateDeviceSpaceAndMemcpyFromHost(ebs, 4);
 
-    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSY\tDRYRUN"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ auto de = new DeviceEvent("KERNEL LOSSY\tDRYRUN");
     if (dims[nDIM] == 1) {
         dim3 blockNum(dims[nBLK0]);
         dim3 threadNum(B_1d);
@@ -106,7 +106,8 @@ void cusz::workflow::DryRun(T* d, T* d_d, string fi, size_t* dims, double* ebs, 
         cusz::dryrun::lorenzo_3d1l<T><<<blockNum, threadNum>>>(d_d, d_dims_L16, d_ebs_L4);
     }
     cudaDeviceSynchronize();
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     cudaMemcpy(d, d_d, len * sizeof(T), cudaMemcpyDeviceToHost);
 

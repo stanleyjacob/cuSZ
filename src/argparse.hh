@@ -18,6 +18,7 @@
 #include <iostream>
 #include <regex>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "format.hh"
@@ -55,7 +56,9 @@ typedef struct ArgPack {
     bool   skip_huffman, skip_writex;
     bool   pre_binning;
 
-    std::vector<Event*> cusz_events;
+    // std::vector<Event*> cusz_events;
+
+    std::vector<std::tuple<std::string, double>> cusz_events_ms;
 
     int  input_rep;        // for standalone huffman
     int  huffman_datalen;  // for standalone huffman

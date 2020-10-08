@@ -32,50 +32,23 @@ typedef std::chrono::time_point<hires> hires_clock_t;
 
 enum class DefinedEvent { kStart, kEnd, kDuration };
 
-class Event {
-    string        event_name;
+class HostEvent {
     hires_clock_t start, end;
-    double        time_elapsed;
+    // double        time_elapsed;
 
    public:
-    Event(string s) { event_name = std::move(s); }
-
-    void Start() { start = hires::now(); }
-    void End() { end = hires::now(); }
-    // double TimeElapsed(size_t len, bool single_unit = true);
-
-    double TimeElapsed(size_t bytelen, bool single_unit = true)
+    string event_name;
+    HostEvent(string s)
     {
-        // if (not start) cerr << "not started" << endl;
-        // if (not end) cerr << "not ended" << endl;
+        event_name = std::move(s);
+        start      = hires::now();
+    }
+
+    double End()
+    {
+        end = hires::now();
         if (start >= end) cerr << "start >= end" << endl;
-        time_elapsed = static_cast<duration_t>(end - start).count();
-
-        if (single_unit) {
-            printf(
-                "time elapsed (us):\t%14.4lf\t|\tthroughput (GB/s):\t%10.3lf\t|\t%s\n",  //
-                time_elapsed * 1e6,                                                      //
-                bytelen / time_elapsed / (1024 * 1024 * 1024),                           //
-                event_name.c_str());
-        }
-        else {
-            if (time_elapsed * 1e3 > 1) {  // > 1 ms
-                printf(
-                    "time elapsed (ms):\t%14.4lf\t|\tthroughput (GB/s):\t%10.3lf\t|\t%s\n",  //
-                    time_elapsed * 1e3,                                                      //
-                    bytelen / time_elapsed / (1024 * 1024 * 1024),                           //
-                    event_name.c_str());
-            }
-            else {
-                printf(
-                    "time elapsed (us):\t%14.4lf\t|\tthroughput (GB/s):\t%10.3lf\t|\t%s\n",  //
-                    time_elapsed * 1e6,                                                      //
-                    bytelen / time_elapsed / (1024 * 1024 * 1024),                           //
-                    event_name.c_str());
-            }
-        }
-
-        return time_elapsed;
+        return static_cast<duration_t>(end - start).count() * 1000;  // in ms
     }
 };
 

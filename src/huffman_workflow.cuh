@@ -37,7 +37,7 @@ const int tBLK_CANONICAL = 128;
 namespace wrapper {
 
 template <typename Q>
-void GetFrequency(Q* d_bcode, size_t len, unsigned int* d_freq, int dict_size);
+void GetFrequency(Q* d_bcode, size_t len, unsigned int* d_freq, int dict_size, argpack* ap);
 
 template <typename H>
 void SetUpHuffmanTree(unsigned int* d_freq, H* d_codebook, int dict_size);

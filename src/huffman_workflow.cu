@@ -38,6 +38,7 @@
 #include "huffman_codec.cuh"
 #include "huffman_workflow.cuh"
 #include "par_huffman.cuh"
+#include "timer.cuh"
 #include "types.hh"
 
 int ht_state_num;
@@ -45,7 +46,7 @@ int ht_all_nodes;
 using uint8__t = uint8_t;
 
 template <typename Q>
-void wrapper::GetFrequency(Q* d_bcode, size_t len, unsigned int* d_freq, int dict_size)
+void wrapper::GetFrequency(Q* d_bcode, size_t len, unsigned int* d_freq, int dict_size, argpack* ap)
 {
     // Parameters for thread and block count optimization
 
@@ -75,10 +76,15 @@ void wrapper::GetFrequency(Q* d_bcode, size_t len, unsigned int* d_freq, int dic
             threadsPerBlock = ((((numValues / (numBlocks * itemsPerThread)) + 1) / 64) + 1) * 64;
         }
     }
+
+    DeviceEvent* de;
+    /*timer*/ de = new DeviceEvent("KERNEL LOSSLESS\thistogramming (end-to-end)");
     p2013Histogram                                                                      //
         <<<numBlocks, threadsPerBlock, ((numBuckets + 1) * RPerBlock) * sizeof(int)>>>  //
         (d_bcode, d_freq, numValues, numBuckets, RPerBlock);
     cudaDeviceSynchronize();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     // TODO make entropy optional
     {
@@ -132,10 +138,9 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
     ht_all_nodes = 2 * ht_state_num;
     auto d_freq  = mem::CreateCUDASpace<unsigned int>(ht_all_nodes);
 
-    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSLESS\thistogramming (end-to-end)"));
-    /*timer*/ ap->cusz_events.back()->Start();
-    wrapper::GetFrequency(d_in, len, d_freq, dict_size);
-    /*timer*/ ap->cusz_events.back()->End();
+    DeviceEvent* de;
+
+    wrapper::GetFrequency(d_in, len, d_freq, dict_size, ap);
 
     // Allocate cb memory
     auto d_canonical_cb = mem::CreateCUDASpace<H>(dict_size, 0xff);
@@ -147,11 +152,11 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
     auto d_decode_meta    = mem::CreateCUDASpace<uint8_t>(decode_meta_size);
 
     // Get codebooks
-    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSLESS\tparallel-get codebook"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ de = new DeviceEvent("KERNEL LOSSLESS\tparallel-get codebook");
     ParGetCodebook<Q, H>(dict_size, d_freq, d_canonical_cb, d_decode_meta);
     cudaDeviceSynchronize();
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     auto decode_meta = mem::CreateHostSpaceAndMemcpyFromDevice(d_decode_meta, decode_meta_size);
 
@@ -164,8 +169,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
     // io::WriteBinaryFile(cb_dump, dict_size, new string(f_in + ".canonized"));
     // --------------------------------
 
-    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSLESS\tquery space for Hwffman-deflate"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ de = new DeviceEvent("KERNEL LOSSLESS\tquery space for Hwffman-deflate");
     // fix-length space
     {
         auto blockDim = tBLK_ENCODE;
@@ -173,7 +177,8 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
         EncodeFixedLen<Q, H><<<gridDim, blockDim>>>(d_in, d_h, len, d_canonical_cb);
         cudaDeviceSynchronize();
     }
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     // deflate
     auto n_chunk       = (len - 1) / chunk_size + 1;  // |
@@ -181,15 +186,15 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
     // cout << log_dbg << "chunk.size:\t" << chunk_size << endl;
     // cout << log_dbg << "chunk.num:\t" << n_chunk << endl;
 
-    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSLESS\tHuffman-deflate"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ de = new DeviceEvent("KERNEL LOSSLESS\tHuffman-deflate");
     {
         auto blockDim = tBLK_DEFLATE;
         auto gridDim  = (n_chunk - 1) / blockDim + 1;
         Deflate<H><<<gridDim, blockDim>>>(d_h, len, d_h_bitwidths, chunk_size);
         cudaDeviceSynchronize();
     }
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     // dump TODO change to int
     auto h_meta        = new size_t[n_chunk * 3]();
@@ -217,8 +222,7 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
     // print densely metadata
     // PrintChunkHuffmanCoding<H>(dH_bit_meta, dH_uInt_meta, len, chunk_size, total_bits, total_uInts);
 
-    /*timer*/ ap->cusz_events.push_back(new Event("PCIe   d2h\tnaive gather Huffman-bitstream"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ de = new DeviceEvent("PCIe   d2h\tnaive gather Huffman-bitstream");
     // copy back densely Huffman code in units of uInt (regarding endianness)
     // TODO reinterpret_cast
     auto h = new H[total_uInts]();
@@ -229,10 +233,10 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
             dH_uInt_meta[i] * sizeof(H),  // len in H-uint
             cudaMemcpyDeviceToHost);
     }
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
-    /*timer*/ ap->cusz_events.push_back(new Event("HOST   I/O\twrite Huffman bitstream and metadata"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ de = new DeviceEvent("HOST   I/O\twrite Huffman bitstream and metadata");
     // dump bit_meta and uInt_meta
     io::WriteArrayToBinary(f_in + ".hmeta", h_meta + n_chunk, (2 * n_chunk));
     // write densely Huffman code and its metadata
@@ -243,7 +247,8 @@ std::tuple<size_t, size_t, size_t> HuffmanEncode(argpack* ap, Q* d_in, size_t le
         reinterpret_cast<uint8_t*>(decode_meta),           //
         sizeof(H) * (2 * type_bw) + sizeof(Q) * dict_size  // first, entry, reversed dict (keys)
     );
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
 
     size_t metadata_size = (2 * n_chunk) * sizeof(decltype(h_meta))              //
                            + sizeof(H) * (2 * type_bw) + sizeof(Q) * dict_size;  // uint8_t
@@ -290,12 +295,13 @@ Q* HuffmanDecode(
     auto d_canonical_singleton = mem::CreateDeviceSpaceAndMemcpyFromHost(canonical_singleton, canonical_meta);
     cudaDeviceSynchronize();
 
-    /*timer*/ ap->cusz_events.push_back(new Event("KERNEL LOSSLESS\tHuffman decode"));
-    /*timer*/ ap->cusz_events.back()->Start();
+    /*timer*/ auto de = new DeviceEvent("KERNEL LOSSLESS\tHuffman decode");
     Decode<<<gridDim, blockDim, canonical_meta>>>(  //
         d_dHcode, d_hcode_meta, d_xbcode, len, chunk_size, n_chunk, d_canonical_singleton, (size_t)canonical_meta);
     cudaDeviceSynchronize();
-    /*timer*/ ap->cusz_events.back()->End();
+    /*timer*/ ap->cusz_events_ms.push_back({de->event_name, de->End()});
+    /*timer*/ delete de;
+    ;
 
     auto xbcode = mem::CreateHostSpaceAndMemcpyFromDevice(d_xbcode, len);
     cudaFree(d_xbcode);
@@ -309,9 +315,9 @@ Q* HuffmanDecode(
     return xbcode;
 }
 
-template void wrapper::GetFrequency<uint8__t>(uint8__t*, size_t, unsigned int*, int);
-template void wrapper::GetFrequency<uint16_t>(uint16_t*, size_t, unsigned int*, int);
-template void wrapper::GetFrequency<uint32_t>(uint32_t*, size_t, unsigned int*, int);
+template void wrapper::GetFrequency<uint8__t>(uint8__t*, size_t, unsigned int*, int, argpack*);
+template void wrapper::GetFrequency<uint16_t>(uint16_t*, size_t, unsigned int*, int, argpack*);
+template void wrapper::GetFrequency<uint32_t>(uint32_t*, size_t, unsigned int*, int, argpack*);
 
 template void PrintChunkHuffmanCoding<uint32_t>(size_t*, size_t*, size_t, int, size_t, size_t);
 template void PrintChunkHuffmanCoding<uint64_t>(size_t*, size_t*, size_t, int, size_t, size_t);
