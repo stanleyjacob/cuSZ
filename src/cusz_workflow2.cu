@@ -9,12 +9,14 @@
  *
  */
 
+#include <memory>
 #include <string>
 
 #include "argparse2_cusz.hh"
 #include "cuda_error_handling.cuh"
 #include "cuda_mem.cuh"
-#include "cusz_workflow.cuh"
+// #include "cusz_workflow.cuh"
+#include "cusz_dualquant.cuh"
 #include "cusz_workflow2.cuh"
 #include "gather_scatter.cuh"
 #include "huffman_workflow.cuh"
@@ -38,24 +40,34 @@ void cusz::interface::Compress2(cuszContext* ctx, struct Metadata<Block>* m)
     auto M   = cusz::impl::GetEdgeOfReinterpretedSquare(m->len);
     auto MxM = M * M;
 
-    auto data = new Data[MxM]();
-    io::ReadBinaryFile<Data>(ctx->get_fname(), data, m->len);
-    auto d_data = mem::CreateDeviceSpaceAndMemcpyFromHost(data, MxM);
+    // auto data = new Data[MxM]();
+    auto data = std::unique_ptr<Data[]>(new Data[MxM]());
 
-    if (ctx->wf_dryrun) {
-        if (ndim == 1)
-            ::dryrun::Lorenzo_nd1l<1>::Call<Block, Data, Quant>(m, d_data);
-        else if (ndim == 2)
-            ::dryrun::Lorenzo_nd1l<2>::Call<Block, Data, Quant>(m, d_data);
-        else if (ndim == 3)
-            ::dryrun::Lorenzo_nd1l<3>::Call<Block, Data, Quant>(m, d_data);
-        delete[] data, cudaFree(d_data), exit(0);
-    }
+    io::ReadBinaryFile<Data>(ctx->get_fname(), data, m->len);
+    auto d_data = mem::CreateDeviceSpaceAndMemcpyFromHost(data.get(), MxM);
 
     metadata_t* d_m;
     cudaMalloc((void**)&d_m, sizeof(metadata_t));
     cudaMemcpy(d_m, m, sizeof(metadata_t), cudaMemcpyHostToDevice);
 
+    if (ctx->wf_dryrun) {
+        void* args[] = {&d_m, &d_data};
+#if __cplusplus >= 201703L
+        cudaLaunchKernel(
+            (void*)dryrun::Lorenzo_nd1l<ndim>::Call<Block, Data>,  //
+            grid_dim, block_dim, args, 0, nullptr);
+#elif __cplusplus >= 201402L
+        if (ndim == 1)
+            cudaLaunchKernel((void*)cusz::dryrun::lorenzo_1d1l<Block, Data>, grid_dim, block_dim, args, 0, nullptr);
+        else if (ndim == 2)
+            cudaLaunchKernel((void*)cusz::dryrun::lorenzo_2d1l<Block, Data>, grid_dim, block_dim, args, 0, nullptr);
+        else if (ndim == 3)
+            cudaLaunchKernel((void*)cusz::dryrun::lorenzo_3d1l<Block, Data>, grid_dim, block_dim, args, 0, nullptr);
+#endif
+        goto COMPRESS_END;
+    }
+
+    if (ctx->wf_zip) {
     auto d_q = mem::CreateCUDASpace<Quant>(m->len);
 
     {  // Lorenzo
@@ -64,24 +76,24 @@ void cusz::interface::Compress2(cuszContext* ctx, struct Metadata<Block>* m)
         size_t cache_size = Block;
         for (auto i = 0; i < ndim - 1; i++) cache_size *= Block;
 
+#if __cplusplus >= 201703L
+            cudaLaunchKernel(
+                (void*)zip::Lorenzo_nd1l<ndim>::Call<Block, Data, Quant>,  //
+                grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
+#elif __cplusplus >= 201402L
         if (ndim == 1)  // compile time?
             cudaLaunchKernel(
-                (void*)zip::Lorenzo_nd1l<1>::Call<Block, Data, Quant>,  //
+                    (void*)cusz::predictor_quantizer::c_lorenzo_1d1l<Block, Data, Quant>,  //
                 grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
         if (ndim == 2)  // compile time?
             cudaLaunchKernel(
-                (void*)zip::Lorenzo_nd1l<2>::Call<Block, Data, Quant>,  //
+                    (void*)cusz::predictor_quantizer::c_lorenzo_2d1l<Block, Data, Quant>,  //
                 grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
         else if (ndim == 3)  // compile time?
             cudaLaunchKernel(
-                (void*)zip::Lorenzo_nd1l<3>::Call<Block, Data, Quant>,  //
+                    (void*)cusz::predictor_quantizer::c_lorenzo_3d1l<Block, Data, Quant>,  //
                 grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
-
-        // goal:
-        // cudaLaunchKernel(
-        //     (void*)zip::Lorenzo_nd1l<ndim>::Call<Block, Data, Quant>,  //
-        //     grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
-
+#endif
         CHECK_CUDA(cudaDeviceSynchronize());
     }
 
@@ -100,8 +112,9 @@ void cusz::interface::Compress2(cuszContext* ctx, struct Metadata<Block>* m)
         lossless::interface::HuffmanEncode<Quant, Huff>(fo_q, d_q, m->len, ctx->h_chunksize, m->cap);
 
     cout << log_info << "Compression finished, saved Huffman encoded quant.code.\n" << endl;
+    }
 
-    delete[] data;
+COMPRESS_END:
     cudaFree(d_data);
 }
 
