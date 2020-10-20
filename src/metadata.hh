@@ -20,16 +20,17 @@
 
 template <size_t Block>
 struct Metadata {
-    size_t const block_size = Block;
-    size_t       ndim;
-    size_t       len = 1;
-    size_t       d0, d1, d2, d3;
-    size_t       stride0, stride1, stride2, stride3;
-    size_t       nb0, nb1, nb2, nb3;  // nb3 not usable in dim
-    size_t       cap, radius;
-    int          nnz;
-    size_t       total_bits, total_uint, huff_metadata_size;
-    double       eb, ebx2, eb_r, ebx2_r;
+    static const size_t block_size = Block;  // extract template parameter
+
+    size_t ndim;
+    size_t len = 1;
+    size_t d0, d1, d2, d3;
+    size_t stride0, stride1, stride2, stride3;
+    size_t nb0, nb1, nb2, nb3;  // nb3 not usable in dim
+    size_t cap, radius;
+    int    nnz;
+    size_t total_bits, total_uint, huff_metadata_size;
+    double eb, ebx2, eb_r, ebx2_r;
 };
 
 template <size_t Block>

@@ -13,83 +13,39 @@
 #include "cusz_dualquant.cuh"
 #include "lorenzo_trait.cuh"
 
-template <>
-struct zip::Lorenzo_nd1l<1> {
+#if __cplusplus >= 201703L
+
+template <int ndim>
+struct zip::Lorenzo_nd1l {
     template <int Block, typename Data, typename Quant>
     static void Call(struct Metadata<Block>* m, Data* d, Quant* q)
     {
-        cusz::predictor_quantizer::c_lorenzo_1d1l<Block, Data, Quant>(m, d, q);
+        constexpr if (n == 1) cusz::predictor_quantizer::c_lorenzo_1d1l<Block, Data, Quant>(m, d, q);
+        constexpr if (n == 2) cusz::predictor_quantizer::c_lorenzo_2d1l<Block, Data, Quant>(m, d, q);
+        constexpr if (n == 3) cusz::predictor_quantizer::c_lorenzo_3d1l<Block, Data, Quant>(m, d, q);
     }
 };
 
-template <>
-struct zip::Lorenzo_nd1l<2> {
-    template <int Block, typename Data, typename Quant>
-    static void Call(struct Metadata<Block>* m, Data* d, Quant* q)
-    {
-        cusz::predictor_quantizer::c_lorenzo_2d1l<Block, Data, Quant>(m, d, q);
-    }
-};
-
-template <>
-struct zip::Lorenzo_nd1l<3> {
-    template <int Block, typename Data, typename Quant>
-    static void Call(struct Metadata<Block>* m, Data* d, Quant* q)
-    {
-        cusz::predictor_quantizer::c_lorenzo_3d1l<Block, Data, Quant>(m, d, q);
-    }
-};
-
-template <>
-struct unzip::Lorenzo_nd1l<1> {
+template <int ndim>
+struct unzip::Lorenzo_nd1l {
     template <int Block, typename Data, typename Quant>
     static void Call(struct Metadata<Block>* m, Data* xd, Data* outlier, Quant* q)
     {
-        cusz::predictor_quantizer::x_lorenzo_1d1l<Block, Data, Quant>(m, xd, outlier, q);
+        constexpr if (n == 1) cusz::predictor_quantizer::x_lorenzo_1d1l<Block, Data, Quant>(m, xd, outlier, q);
+        constexpr if (n == 2) cusz::predictor_quantizer::x_lorenzo_2d1l<Block, Data, Quant>(m, xd, outlier, q);
+        constexpr if (n == 3) cusz::predictor_quantizer::x_lorenzo_3d1l<Block, Data, Quant>(m, xd, outlier, q);
     }
 };
 
-template <>
-struct unzip::Lorenzo_nd1l<2> {
-    template <int Block, typename Data, typename Quant>
-    static void Call(struct Metadata<Block>* m, Data* xd, Data* outlier, Quant* q)
-    {
-        cusz::predictor_quantizer::x_lorenzo_2d1l<Block, Data, Quant>(m, xd, outlier, q);
-    }
-};
-
-template <>
-struct unzip::Lorenzo_nd1l<3> {
-    template <int Block, typename Data, typename Quant>
-    static void Call(struct Metadata<Block>* m, Data* xd, Data* outlier, Quant* q)
-    {
-        cusz::predictor_quantizer::x_lorenzo_2d1l<Block, Data, Quant>(m, xd, outlier, q);
-    }
-};
-
-template <>
-struct dryrun::Lorenzo_nd1l<1> {
+template <int ndim>
+struct dryrun::Lorenzo_nd1l {
     template <int Block, typename Data>
     static void Call(struct Metadata<Block>* m, Data* d)
     {
-        cusz::dryrun::lorenzo_1d1l(m, d);
+        constexpr if (n == 1) cusz::dryrun::lorenzo_1d1l(m, d);
+        constexpr if (n == 2) cusz::dryrun::lorenzo_2d1l(m, d);
+        constexpr if (n == 3) cusz::dryrun::lorenzo_3d1l(m, d);
     }
 };
 
-template <>
-struct dryrun::Lorenzo_nd1l<2> {
-    template <int Block, typename Data>
-    static void Call(struct Metadata<Block>* m, Data* d)
-    {
-        cusz::dryrun::lorenzo_2d1l(m, d);
-    }
-};
-
-template <>
-struct dryrun::Lorenzo_nd1l<3> {
-    template <int Block, typename Data>
-    static void Call(struct Metadata<Block>* m, Data* d)
-    {
-        cusz::dryrun::lorenzo_3d1l(m, d);
-    }
-};
+#endif
