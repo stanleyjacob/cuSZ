@@ -27,12 +27,16 @@
 #include "metadata.hh"
 #include "type_trait.hh"
 
-template <int ndim, int Block, typename Data, int QuantByte, int HuffByte>
-void cusz::interface::Compress2(cuszContext* ctx, struct Metadata<Block>* m)
+typedef cuszContext ctx_t;
+
+template <int ndim, typename Data, int QuantByte, int HuffByte>
+void cusz::interface::Compress2(ctx_t* ctx, typename MetadataTrait<ndim>::metadata_t* m)
 {
-    typedef struct Metadata<Block>                metadata_t;
-    typedef typename QuantTrait<QuantByte>::Quant Quant;
-    typedef typename HuffTrait<HuffByte>::Huff    Huff;
+    typedef typename MetadataTrait<ndim>::metadata_t metadata_t;
+    typedef typename QuantTrait<QuantByte>::Quant    Quant;
+    typedef typename HuffTrait<HuffByte>::Huff       Huff;
+
+    static const int Block = MetadataTrait<ndim>::Block;
 
     string fo_zip     = ctx->get_fname() + ".sza";
     string fo_q       = ctx->get_fname() + ".b" + std::to_string(QuantByte * 8);
@@ -119,12 +123,28 @@ COMPRESS_END:
     cudaFree(d_data);
 }
 
-template <int ndim, int Block, typename Data, int QuantByte, int HuffByte>
-void cusz::interface::Decompress2(cuszContext* ctx, struct Metadata<Block>* m)
+/*ndim, Data, QuantByte, HuffByte*/
+template <>
+void cusz::interface::Compress2<1, float, 1, 4>(ctx_t*, MetadataTrait<1>::metadata_t*);
+template <>
+void cusz::interface::Compress2<1, float, 2, 4>(ctx_t*, MetadataTrait<1>::metadata_t*);
+template <>
+void cusz::interface::Compress2<2, float, 1, 4>(ctx_t*, MetadataTrait<2>::metadata_t*);
+template <>
+void cusz::interface::Compress2<2, float, 2, 4>(ctx_t*, MetadataTrait<2>::metadata_t*);
+template <>
+void cusz::interface::Compress2<3, float, 1, 4>(ctx_t*, MetadataTrait<3>::metadata_t*);
+template <>
+void cusz::interface::Compress2<3, float, 3, 4>(ctx_t*, MetadataTrait<3>::metadata_t*);
+
+template <int ndim, typename Data, int QuantByte, int HuffByte>
+void cusz::interface::Decompress2(ctx_t* ctx, typename MetadataTrait<ndim>::metadata_t* m)
 {
-    typedef struct Metadata<Block>                metadata_t;  // instead of `typename`
-    typedef typename QuantTrait<QuantByte>::Quant Quant;
-    typedef typename HuffTrait<HuffByte>::Huff    Huff;
+    typedef typename MetadataTrait<ndim>::metadata_t metadata_t;
+    typedef typename QuantTrait<QuantByte>::Quant    Quant;
+    typedef typename HuffTrait<HuffByte>::Huff       Huff;
+
+    static const int Block = MetadataTrait<ndim>::Block;
 
     // todo, put in context
     string fo_x       = ctx->get_fname() + ".szx";
@@ -192,10 +212,31 @@ void cusz::interface::Decompress2(cuszContext* ctx, struct Metadata<Block>* m)
     cudaFree(d_xq);
 }
 
-template <int ndim, int Block, typename Data, typename Quant>
-void cusz::impl::VerifyHuffman(cuszContext* ctx, struct Metadata<Block>* m, Quant* xq)
+// int ndim, typename Data, int QuantByte, int HuffByte
+template <>
+void cusz::interface::Decompress2<1, float, 1, 4>(ctx_t*, MetadataTrait<1>::metadata_t*);
+template <>
+void cusz::interface::Decompress2<1, float, 1, 4>(ctx_t*, MetadataTrait<1>::metadata_t*);
+template <>
+void cusz::interface::Decompress2<2, float, 1, 4>(ctx_t*, MetadataTrait<2>::metadata_t*);
+template <>
+void cusz::interface::Decompress2<2, float, 2, 4>(ctx_t*, MetadataTrait<2>::metadata_t*);
+template <>
+void cusz::interface::Decompress2<3, float, 1, 4>(ctx_t*, MetadataTrait<3>::metadata_t*);
+template <>
+void cusz::interface::Decompress2<3, float, 2, 4>(ctx_t*, MetadataTrait<3>::metadata_t*);
+
+template <int ndim, typename Data, int QuantByte>
+void cusz::impl::VerifyHuffman(
+    ctx_t*                                    ctx,
+    typename MetadataTrait<ndim>::metadata_t* m,
+    typename QuantTrait<QuantByte>::Quant*    xq)
 {
-    typedef struct Metadata<Block> metadata_t;
+    typedef typename MetadataTrait<ndim>::metadata_t metadata_t;
+    typedef typename QuantTrait<QuantByte>::Quant    Quant;
+
+    static const int Block = MetadataTrait<ndim>::Block;
+
     // TODO error handling from invalid read
     // cout << log_info << "Redo PdQ just to get quantization dump." << endl;
 
@@ -204,7 +245,7 @@ void cusz::impl::VerifyHuffman(cuszContext* ctx, struct Metadata<Block>* m, Quan
     auto  d_q    = mem::CreateCUDASpace<Quant>(m->len);
 
     metadata_t* d_m;
-    cudaMalloc((void**)&d_m, sizeof(metadata_t));
+    cudaMalloc(&d_m, sizeof(metadata_t));
     cudaMemcpy(d_m, m, sizeof(metadata_t), cudaMemcpyHostToDevice);
 
     {  // Lorenzo
@@ -213,19 +254,24 @@ void cusz::impl::VerifyHuffman(cuszContext* ctx, struct Metadata<Block>* m, Quan
         size_t cache_size = Block;
         for (auto i = 0; i < m->ndim - 1; i++) cache_size *= Block;
 
+#if __cplusplus >= 201703L
+        cudaLaunchKernel(
+            (void*)zip::Lorenzo_nd1l<ndim>::Call<Block, Data, Quant>,  //
+            grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
+#elif __cplusplus >= 201402L
         if (ndim == 1)  // compile time?
             cudaLaunchKernel(
-                (void*)zip::Lorenzo_nd1l<1>::Call<Block, Data, Quant>,  //
+                (void*)cusz::predictor_quantizer::c_lorenzo_1d1l<Block, Data, Quant>,  //
                 grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
-        if (ndim == 3)  // compile time?
+        if (ndim == 2)  // compile time?
             cudaLaunchKernel(
-                (void*)zip::Lorenzo_nd1l<2>::Call<Block, Data, Quant>,  //
+                (void*)cusz::predictor_quantizer::c_lorenzo_2d1l<Block, Data, Quant>,  //
                 grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
-        else if (ndim == 2)  // compile time?
+        else if (ndim == 3)  // compile time?
             cudaLaunchKernel(
-                (void*)zip::Lorenzo_nd1l<3>::Call<Block, Data, Quant>,  //
+                (void*)cusz::predictor_quantizer::c_lorenzo_3d1l<Block, Data, Quant>,  //
                 grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
-
+#endif
         CHECK_CUDA(cudaDeviceSynchronize());
     }
 
@@ -274,3 +320,17 @@ void cusz::impl::VerifyHuffman(cuszContext* ctx, struct Metadata<Block>* m, Quan
     delete[] veri_q, delete[] data;
     // end of if count
 }
+
+// template <int ndim, typename Data, int QuantByte>
+template <>
+void cusz::impl::VerifyHuffman<1, float, 1>(ctx_t*, MetadataTrait<1>::metadata_t*, QuantTrait<1>::Quant*);
+template <>
+void cusz::impl::VerifyHuffman<1, float, 2>(ctx_t*, MetadataTrait<1>::metadata_t*, QuantTrait<2>::Quant*);
+template <>
+void cusz::impl::VerifyHuffman<2, float, 1>(ctx_t*, MetadataTrait<2>::metadata_t*, QuantTrait<1>::Quant*);
+template <>
+void cusz::impl::VerifyHuffman<2, float, 2>(ctx_t*, MetadataTrait<2>::metadata_t*, QuantTrait<2>::Quant*);
+template <>
+void cusz::impl::VerifyHuffman<3, float, 1>(ctx_t*, MetadataTrait<3>::metadata_t*, QuantTrait<1>::Quant*);
+template <>
+void cusz::impl::VerifyHuffman<3, float, 2>(ctx_t*, MetadataTrait<3>::metadata_t*, QuantTrait<2>::Quant*);

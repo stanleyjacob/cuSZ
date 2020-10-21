@@ -47,6 +47,7 @@ const size_t EBx2_r = 3;
 // template <int ndim, int, Block, typename Data, typename Quant>
 // typename std::enable_if<std::equa>
 
+// decoupled from dimension (redundant)
 template <int Block, typename Data, typename Quant>
 __global__ void cusz::predictor_quantizer::c_lorenzo_1d1l(struct Metadata<Block>* m, Data* d, Quant* q)
 {
