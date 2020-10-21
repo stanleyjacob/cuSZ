@@ -18,6 +18,7 @@
 // #include "cusz_workflow.cuh"
 #include "cusz_dualquant.cuh"
 #include "cusz_workflow2.cuh"
+#include "format.hh"
 #include "gather_scatter.cuh"
 #include "huffman_workflow.cuh"
 #include "io.hh"
@@ -68,50 +69,50 @@ void cusz::interface::Compress2(cuszContext* ctx, struct Metadata<Block>* m)
     }
 
     if (ctx->wf_zip) {
-    auto d_q = mem::CreateCUDASpace<Quant>(m->len);
+        auto d_q = mem::CreateCUDASpace<Quant>(m->len);
 
-    {  // Lorenzo
-        void*  args[] = {&d_m, &d_data, &d_q};
-        dim3   grid_dim(m->nb0, m->nb1, m->nb2), block_dim(m->b0, m->b1, m->b2);
-        size_t cache_size = Block;
-        for (auto i = 0; i < ndim - 1; i++) cache_size *= Block;
+        {  // Lorenzo
+            void*  args[] = {&d_m, &d_data, &d_q};
+            dim3   grid_dim(m->nb0, m->nb1, m->nb2), block_dim(m->b0, m->b1, m->b2);
+            size_t cache_size = Block;
+            for (auto i = 0; i < ndim - 1; i++) cache_size *= Block;
 
 #if __cplusplus >= 201703L
             cudaLaunchKernel(
                 (void*)zip::Lorenzo_nd1l<ndim>::Call<Block, Data, Quant>,  //
                 grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
 #elif __cplusplus >= 201402L
-        if (ndim == 1)  // compile time?
-            cudaLaunchKernel(
+            if (ndim == 1)  // compile time?
+                cudaLaunchKernel(
                     (void*)cusz::predictor_quantizer::c_lorenzo_1d1l<Block, Data, Quant>,  //
-                grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
-        if (ndim == 2)  // compile time?
-            cudaLaunchKernel(
+                    grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
+            if (ndim == 2)  // compile time?
+                cudaLaunchKernel(
                     (void*)cusz::predictor_quantizer::c_lorenzo_2d1l<Block, Data, Quant>,  //
-                grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
-        else if (ndim == 3)  // compile time?
-            cudaLaunchKernel(
+                    grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
+            else if (ndim == 3)  // compile time?
+                cudaLaunchKernel(
                     (void*)cusz::predictor_quantizer::c_lorenzo_3d1l<Block, Data, Quant>,  //
-                grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
+                    grid_dim, block_dim, args, cache_size * sizeof(Data), nullptr);
 #endif
-        CHECK_CUDA(cudaDeviceSynchronize());
-    }
+            CHECK_CUDA(cudaDeviceSynchronize());
+        }
 
-    if (ctx->skip_huff) {
-        auto q = mem::CreateHostSpaceAndMemcpyFromDevice(d_q, m->len);
-        io::WriteBinaryFile(q, m->len, &fo_q);
-        // TODO log
-        delete[] q, delete[] data, cudaFree(d_q), cudaFree(d_data), exit(0);
-    }
+        if (ctx->skip_huff) {
+            auto q = mem::CreateHostSpaceAndMemcpyFromDevice(d_q, m->len);
+            io::WriteBinaryFile(q, m->len, &fo_q);
+            // TODO log
+            delete[] q, delete[] data, cudaFree(d_q), cudaFree(d_data), exit(0);
+        }
 
-    // handle outlier
-    ::cusz::impl::PruneGatherAsCSR(d_data, MxM, M /*lda*/, M /*m*/, M /*n*/, m->nnz, &fo_outlier);
+        // handle outlier
+        ::cusz::impl::PruneGatherAsCSR(d_data, MxM, M /*lda*/, M /*m*/, M /*n*/, m->nnz, &fo_outlier);
 
-    // TODO handle metadata
-    std::tie(m->n_bits, m->n_uint, m->huff_metadata_size) =
-        lossless::interface::HuffmanEncode<Quant, Huff>(fo_q, d_q, m->len, ctx->h_chunksize, m->cap);
+        // TODO handle metadata
+        std::tie(m->n_bits, m->n_uint, m->huff_metadata_size) =
+            lossless::interface::HuffmanEncode<Quant, Huff>(fo_q, d_q, m->len, ctx->h_chunksize, m->cap);
 
-    cout << log_info << "Compression finished, saved Huffman encoded quant.code.\n" << endl;
+        cout << log_info << "Compression finished, saved Huffman encoded quant.code.\n" << endl;
     }
 
 COMPRESS_END:
@@ -125,6 +126,7 @@ void cusz::interface::Decompress2(cuszContext* ctx, struct Metadata<Block>* m)
     typedef typename QuantTrait<QuantByte>::Quant Quant;
     typedef typename HuffTrait<HuffByte>::Huff    Huff;
 
+    // todo, put in context
     string fo_x       = ctx->get_fname() + ".szx";
     string fi_qbase   = ctx->get_fname() + ".b" + std::to_string(QuantByte * 8);
     string fi_outlier = fi_qbase + ".outlier";
@@ -140,6 +142,54 @@ void cusz::interface::Decompress2(cuszContext* ctx, struct Metadata<Block>* m)
             fi_qbase, m->len, ctx->h_chunksize, m->total_uint, m->cap);
         if (ctx->verify_huffman) cusz::impl::VerifyHuffman<Data, Quant>(ctx, m, xq);
     }
+    auto d_xq      = mem::CreateDeviceSpaceAndMemcpyFromHost(xq, m->len);
+    auto d_outlier = mem::CreateCUDASpace<Data>(MxM);
+
+    cusz::impl::ScatterFromCSR(d_outlier, MxM, M, M, M, &m->nnz, &fi_outlier);
+
+    metadata_t* d_m;
+    cudaMalloc(&d_m, sizeof(metadata_t));
+    cudaMemcpy(d_m, m, sizeof(metadata_t), cudaMemcpyHostToDevice);
+
+    auto d_xdata = mem::CreateCUDASpace<Data>(m->len);
+
+    {  // Lorenzo
+        void* args[] = {&d_m, &d_xdata, &d_xq};
+        dim3  grid_dim(m->nb0, m->nb1, m->nb2), block_dim(m->b0, m->b1, m->b2);
+        // size_t cache_size = Block;
+        // for (auto i = 0; i < ndim - 1; i++) cache_size *= Block;
+
+#if __cplusplus >= 201703L
+        cudaLaunchKernel(
+            (void*)unzip::Lorenzo_nd1l<ndim>::Call<Block, Data, Quant>,  //
+            grid_dim, block_dim, args, 0, nullptr);
+#elif __cplusplus >= 201402L
+        if (ndim == 1)  // compile time?
+            cudaLaunchKernel(
+                (void*)cusz::predictor_quantizer::x_lorenzo_1d1l<Block, Data, Quant>,  //
+                grid_dim, block_dim, args, 0, nullptr);
+        if (ndim == 2)  // compile time?
+            cudaLaunchKernel(
+                (void*)cusz::predictor_quantizer::x_lorenzo_2d1l<Block, Data, Quant>,  //
+                grid_dim, block_dim, args, 0, nullptr);
+        else if (ndim == 3)  // compile time?
+            cudaLaunchKernel(
+                (void*)cusz::predictor_quantizer::x_lorenzo_3d1l<Block, Data, Quant>,  //
+                grid_dim, block_dim, args, 0, nullptr);
+#endif
+        CHECK_CUDA(cudaDeviceSynchronize());
+    }
+    auto xdata = mem::CreateHostSpaceAndMemcpyFromDevice(d_xdata, m->len);
+    if (not ctx->skip_writex)
+        io::WriteArrayToBinary(fo_x, xdata, m->len);
+    else
+        cout << log_info << "Skipped writing unzipped data to filesystem." << endl;
+
+    delete[] xdata;
+    delete[] xq;
+    cudaFree(d_xdata);
+    cudaFree(d_outlier);
+    cudaFree(d_xq);
 }
 
 template <int ndim, int Block, typename Data, typename Quant>
