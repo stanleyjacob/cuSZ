@@ -1,3 +1,6 @@
+#ifndef TYPE_TRAIT_HH
+#define TYPE_TRAIT_HH
+
 /**
  * @file type_trait.hh
  * @author Jiannan Tian
@@ -11,7 +14,7 @@
 
 #include "metadata.hh"
 
-template <int ndim, int Block = 0>
+template <int ndim>
 struct MetadataTrait;
 
 template <>
@@ -24,16 +27,6 @@ struct MetadataTrait<1> {
 // struct MetadataTrait<11> {
 //     typedef struct Metadata<64> metadata_t;
 //     static const int            Block = 64;
-// };
-
-// template <>
-// struct MetadataTrait<21> {
-//     typedef struct Metadata<64> metadata_t;
-// };
-
-// template <>
-// struct MetadataTrait<31> {
-//     typedef struct Metadata<128> metadata_t;
 // };
 
 template <>
@@ -61,3 +54,5 @@ template <> struct CodebookTrait<8> {typedef unsigned long long Huff;};
 template <int HuffByte> struct HuffTrait;
 template <> struct HuffTrait<4> {typedef unsigned long Huff;};
 template <> struct HuffTrait<8> {typedef unsigned long long Huff;};
+
+#endif

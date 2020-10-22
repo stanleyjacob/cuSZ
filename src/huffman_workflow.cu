@@ -40,9 +40,10 @@
 int ht_state_num;
 int ht_all_nodes;
 using uint8__t = uint8_t;
+using Freq     = unsigned int;
 
 template <typename UInt>
-void lossless::wrap::GetFrequency(UInt* d_data, size_t len, unsigned int* d_freq, int num_bins)
+void lossless::wrap::GetFrequency(UInt* d_data, size_t len, Freq* d_freq, int num_bins)
 {
     // Parameters for thread and block count optimization
 
@@ -62,8 +63,7 @@ void lossless::wrap::GetFrequency(UInt* d_data, size_t len, unsigned int* d_freq
     int RPerBlock      = (maxbytes / (int)sizeof(int)) / (numBuckets + 1);
     int numBlocks      = numSMs;
     cudaFuncSetAttribute(
-        data_process::reduce::p2013Histogram<UInt, unsigned int>, cudaFuncAttributeMaxDynamicSharedMemorySize,
-        maxbytes);
+        data_process::reduce::p2013Histogram<UInt, Freq>, cudaFuncAttributeMaxDynamicSharedMemorySize, maxbytes);
     // fits to size
     int threadsPerBlock = ((((numValues / (numBlocks * itemsPerThread)) + 1) / 64) + 1) * 64;
     while (threadsPerBlock > 1024) {

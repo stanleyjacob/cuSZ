@@ -1,5 +1,4 @@
-#ifndef CUDA_MEM_CUH
-#define CUDA_MEM_CUH
+#pragma once
 
 /**
  * @file cuda_mem.cu
@@ -17,6 +16,11 @@
 #include <cuda_runtime.h>
 #include <cstdint>
 
+template <typename T>
+struct CUDADeleter {  //
+    void operator()(T* ptr) { cudaFree(ptr); }
+};
+
 namespace mem {
 
 enum MemcpyDirection { h2d, d2h };
@@ -32,6 +36,5 @@ T* CreateDeviceSpaceAndMemcpyFromHost(T* var, size_t l);
 
 template <typename T>
 T* CreateHostSpaceAndMemcpyFromDevice(T* d_var, size_t l);
-}  // namespace mem
 
-#endif
+}  // namespace mem

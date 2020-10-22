@@ -17,21 +17,18 @@
 #include "metadata.hh"
 #include "type_trait.hh"
 
-typedef cuszContext context_t;
+typedef cuszContext ctx_t;
 
 template <int ndim, typename Data, int QuantByte, int HuffByte>
-void main_alt(cuszContext* ctx, unsigned char* archive_bin, unsigned char* metadata_bin)
+void main_alt(ctx_t* ctx, unsigned char* archive_bin, unsigned char* metadata_bin)
 {
     typedef typename MetadataTrait<ndim>::metadata_t metadata_t;
-    // auto ctx = new cuszContext(argc, argv);
+
     auto m = new metadata_t;
 
     ctx->Export(m);
-    if (ctx->mode == CompressMode::kR2R) {
-        auto val_rng = GetDatumValueRange<Data>(ctx->get_fname(), m->len);
-        cuszChangeToR2RModeMode(m, val_rng);
-    }
+    if (ctx->mode == CompressMode::kR2R) cuszChangeToR2RModeMode(m, GetDatumValueRange<Data>(ctx->get_fname(), m->len));
 
-    if (ctx->wf_zip or ctx->wf_dryrun) cusz::interface::Compress2<Data, QuantByte, HuffByte>(ctx, m);
-    if (ctx->wf_unzip) cusz::interface::Decompress2<Data, QuantByte, HuffByte>(ctx, m);
+    if (ctx->wf_zip or ctx->wf_dryrun) cusz::interface::Compress2<ndim, Data, QuantByte, HuffByte>(ctx, m);
+    if (ctx->wf_unzip) cusz::interface::Decompress2<ndim, Data, QuantByte, HuffByte>(ctx, m);
 }
