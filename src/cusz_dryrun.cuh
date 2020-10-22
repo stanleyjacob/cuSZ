@@ -25,6 +25,7 @@ __global__ void lorenzo_2d1l(struct Metadata<Block>* m, Data* d);
 template <int Block, typename Data>
 __global__ void lorenzo_3d1l(struct Metadata<Block>* m, Data* d);
 
+// deprecated
 template <typename Data>
 __global__ void lorenzo_1d1l(Data*, size_t*, double*);
 

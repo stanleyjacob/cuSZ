@@ -123,20 +123,6 @@ COMPRESS_END:
     cudaFree(d_data);
 }
 
-/*ndim, Data, QuantByte, HuffByte*/
-template <>
-void cusz::interface::Compress2<1, float, 1, 4>(ctx_t*, MetadataTrait<1>::metadata_t*);
-template <>
-void cusz::interface::Compress2<1, float, 2, 4>(ctx_t*, MetadataTrait<1>::metadata_t*);
-template <>
-void cusz::interface::Compress2<2, float, 1, 4>(ctx_t*, MetadataTrait<2>::metadata_t*);
-template <>
-void cusz::interface::Compress2<2, float, 2, 4>(ctx_t*, MetadataTrait<2>::metadata_t*);
-template <>
-void cusz::interface::Compress2<3, float, 1, 4>(ctx_t*, MetadataTrait<3>::metadata_t*);
-template <>
-void cusz::interface::Compress2<3, float, 3, 4>(ctx_t*, MetadataTrait<3>::metadata_t*);
-
 template <int ndim, typename Data, int QuantByte, int HuffByte>
 void cusz::interface::Decompress2(ctx_t* ctx, typename MetadataTrait<ndim>::metadata_t* m)
 {
@@ -211,20 +197,6 @@ void cusz::interface::Decompress2(ctx_t* ctx, typename MetadataTrait<ndim>::meta
     cudaFree(d_outlier);
     cudaFree(d_xq);
 }
-
-// int ndim, typename Data, int QuantByte, int HuffByte
-template <>
-void cusz::interface::Decompress2<1, float, 1, 4>(ctx_t*, MetadataTrait<1>::metadata_t*);
-template <>
-void cusz::interface::Decompress2<1, float, 1, 4>(ctx_t*, MetadataTrait<1>::metadata_t*);
-template <>
-void cusz::interface::Decompress2<2, float, 1, 4>(ctx_t*, MetadataTrait<2>::metadata_t*);
-template <>
-void cusz::interface::Decompress2<2, float, 2, 4>(ctx_t*, MetadataTrait<2>::metadata_t*);
-template <>
-void cusz::interface::Decompress2<3, float, 1, 4>(ctx_t*, MetadataTrait<3>::metadata_t*);
-template <>
-void cusz::interface::Decompress2<3, float, 2, 4>(ctx_t*, MetadataTrait<3>::metadata_t*);
 
 template <int ndim, typename Data, int QuantByte>
 void cusz::impl::VerifyHuffman(
@@ -321,16 +293,36 @@ void cusz::impl::VerifyHuffman(
     // end of if count
 }
 
+typedef MetadataTrait<1>::metadata_t m1_t;
+typedef MetadataTrait<2>::metadata_t m2_t;
+typedef MetadataTrait<3>::metadata_t m3_t;
+
+typedef QuantTrait<1>::Quant q1_t;
+typedef QuantTrait<2>::Quant q2_t;
+
+typedef float  fp32;
+typedef double fp64;
+
+// ndim, Data, QuantByte, HuffByte
+template void cusz::interface::Compress2<1, fp32, 1, 4>(ctx_t*, m1_t*);
+template void cusz::interface::Compress2<1, fp32, 2, 4>(ctx_t*, m1_t*);
+template void cusz::interface::Compress2<2, fp32, 1, 4>(ctx_t*, m2_t*);
+template void cusz::interface::Compress2<2, fp32, 2, 4>(ctx_t*, m2_t*);
+template void cusz::interface::Compress2<3, fp32, 1, 4>(ctx_t*, m3_t*);
+template void cusz::interface::Compress2<3, fp32, 3, 4>(ctx_t*, m3_t*);
+
+// int ndim, typename Data, int QuantByte, int HuffByte
+template void cusz::interface::Decompress2<1, fp32, 1, 4>(ctx_t*, m1_t*);
+template void cusz::interface::Decompress2<1, fp32, 2, 4>(ctx_t*, m1_t*);
+template void cusz::interface::Decompress2<2, fp32, 1, 4>(ctx_t*, m2_t*);
+template void cusz::interface::Decompress2<2, fp32, 2, 4>(ctx_t*, m2_t*);
+template void cusz::interface::Decompress2<3, fp32, 1, 4>(ctx_t*, m3_t*);
+template void cusz::interface::Decompress2<3, fp32, 2, 4>(ctx_t*, m3_t*);
+
 // template <int ndim, typename Data, int QuantByte>
-template <>
-void cusz::impl::VerifyHuffman<1, float, 1>(ctx_t*, MetadataTrait<1>::metadata_t*, QuantTrait<1>::Quant*);
-template <>
-void cusz::impl::VerifyHuffman<1, float, 2>(ctx_t*, MetadataTrait<1>::metadata_t*, QuantTrait<2>::Quant*);
-template <>
-void cusz::impl::VerifyHuffman<2, float, 1>(ctx_t*, MetadataTrait<2>::metadata_t*, QuantTrait<1>::Quant*);
-template <>
-void cusz::impl::VerifyHuffman<2, float, 2>(ctx_t*, MetadataTrait<2>::metadata_t*, QuantTrait<2>::Quant*);
-template <>
-void cusz::impl::VerifyHuffman<3, float, 1>(ctx_t*, MetadataTrait<3>::metadata_t*, QuantTrait<1>::Quant*);
-template <>
-void cusz::impl::VerifyHuffman<3, float, 2>(ctx_t*, MetadataTrait<3>::metadata_t*, QuantTrait<2>::Quant*);
+template void cusz::impl::VerifyHuffman<1, fp32, 1>(ctx_t*, m1_t*, q1_t*);
+template void cusz::impl::VerifyHuffman<1, fp32, 2>(ctx_t*, m1_t*, q2_t*);
+template void cusz::impl::VerifyHuffman<2, fp32, 1>(ctx_t*, m2_t*, q1_t*);
+template void cusz::impl::VerifyHuffman<2, fp32, 2>(ctx_t*, m2_t*, q2_t*);
+template void cusz::impl::VerifyHuffman<3, fp32, 1>(ctx_t*, m3_t*, q1_t*);
+template void cusz::impl::VerifyHuffman<3, fp32, 2>(ctx_t*, m3_t*, q2_t*);
