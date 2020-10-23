@@ -20,7 +20,7 @@
 
 template <size_t Block>
 struct Metadata {
-    static const size_t block_size = Block;  // extract template parameter
+    static const size_t b = Block;  // extract template parameter
 
     size_t ndim;
     size_t len = 1;
@@ -29,8 +29,9 @@ struct Metadata {
     size_t nb0, nb1, nb2, nb3;  // nb3 not usable in dim
     size_t cap, radius;
     int    nnz;
-    size_t total_bits, total_uint, huff_metadata_size;
     double eb, ebx2, eb_r, ebx2_r;
+    // TODO caution! host-device sync
+    size_t total_bits, total_uint, huff_metadata_size;
 };
 
 template <size_t Block>

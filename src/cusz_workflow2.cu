@@ -17,6 +17,7 @@
 #include "cuda_mem.cuh"
 // #include "cusz_workflow.cuh"
 #include "cusz_dualquant.cuh"
+#include "cusz_workflow.cuh"
 #include "cusz_workflow2.cuh"
 #include "format.hh"
 #include "gather_scatter.cuh"
@@ -48,7 +49,7 @@ void cusz::interface::Compress2(ctx_t* ctx, typename MetadataTrait<ndim>::metada
     // auto data = new Data[MxM]();
     auto data = std::unique_ptr<Data[]>(new Data[MxM]());
 
-    io::ReadBinaryFile<Data>(ctx->get_fname(), data, m->len);
+    io::ReadBinaryToArray<Data>(ctx->get_fname(), data.get(), m->len);
     auto d_data = mem::CreateDeviceSpaceAndMemcpyFromHost(data.get(), MxM);
 
     metadata_t* d_m;
@@ -57,6 +58,7 @@ void cusz::interface::Compress2(ctx_t* ctx, typename MetadataTrait<ndim>::metada
 
     if (ctx->wf_dryrun) {
         void* args[] = {&d_m, &d_data};
+        dim3  grid_dim(m->nb0, m->nb1, m->nb2), block_dim(m->b, m->b, m->b);
 #if __cplusplus >= 201703L
         cudaLaunchKernel(
             (void*)dryrun::Lorenzo_nd1l<ndim>::Call<Block, Data>,  //
@@ -77,7 +79,7 @@ void cusz::interface::Compress2(ctx_t* ctx, typename MetadataTrait<ndim>::metada
 
         {  // Lorenzo
             void*  args[] = {&d_m, &d_data, &d_q};
-            dim3   grid_dim(m->nb0, m->nb1, m->nb2), block_dim(m->b0, m->b1, m->b2);
+            dim3   grid_dim(m->nb0, m->nb1, m->nb2), block_dim(m->b, m->b, m->b);
             size_t cache_size = Block;
             for (auto i = 0; i < ndim - 1; i++) cache_size *= Block;
 
@@ -104,16 +106,16 @@ void cusz::interface::Compress2(ctx_t* ctx, typename MetadataTrait<ndim>::metada
 
         if (ctx->skip_huff) {
             auto q = mem::CreateHostSpaceAndMemcpyFromDevice(d_q, m->len);
-            io::WriteBinaryFile(q, m->len, &fo_q);
+            io::WriteArrayToBinary(fo_q, q, m->len);
             // TODO log
-            delete[] q, delete[] data, cudaFree(d_q), cudaFree(d_data), exit(0);
+            delete[] q, cudaFree(d_q), cudaFree(d_data), exit(0);
         }
 
         // handle outlier
         ::cusz::impl::PruneGatherAsCSR(d_data, MxM, M /*lda*/, M /*m*/, M /*n*/, m->nnz, &fo_outlier);
 
         // TODO handle metadata
-        std::tie(m->n_bits, m->n_uint, m->huff_metadata_size) =
+        std::tie(m->total_bits, m->total_uint, m->huff_metadata_size) =
             lossless::interface::HuffmanEncode<Quant, Huff>(fo_q, d_q, m->len, ctx->h_chunksize, m->cap);
 
         cout << log_info << "Compression finished, saved Huffman encoded quant.code.\n" << endl;
@@ -142,11 +144,11 @@ void cusz::interface::Decompress2(ctx_t* ctx, typename MetadataTrait<ndim>::meta
 
     Quant* xq;
     // step 1: read from filesystem or do Huffman decoding to get quant code
-    if (ctx->skip_huff) { xq = io::ReadBinaryFile<Quant>(fi_qbase, m->len); }
+    if (ctx->skip_huff) { xq = io::ReadBinaryToNewArray<Quant>(fi_qbase, m->len); }
     else {
         xq = ::lossless::interface::HuffmanDecode<Quant, Huff>(
             fi_qbase, m->len, ctx->h_chunksize, m->total_uint, m->cap);
-        if (ctx->verify_huffman) cusz::impl::VerifyHuffman<Data, Quant>(ctx, m, xq);
+        if (ctx->verify_huffman) cusz::impl::VerifyHuffman<ndim, Data, QuantByte>(ctx, m, xq);
     }
     auto d_xq      = mem::CreateDeviceSpaceAndMemcpyFromHost(xq, m->len);
     auto d_outlier = mem::CreateCUDASpace<Data>(MxM);
@@ -161,7 +163,7 @@ void cusz::interface::Decompress2(ctx_t* ctx, typename MetadataTrait<ndim>::meta
 
     {  // Lorenzo
         void* args[] = {&d_m, &d_xdata, &d_xq};
-        dim3  grid_dim(m->nb0, m->nb1, m->nb2), block_dim(m->b0, m->b1, m->b2);
+        dim3  grid_dim(m->nb0, m->nb1, m->nb2), block_dim(m->b, m->b, m->b);
         // size_t cache_size = Block;
         // for (auto i = 0; i < ndim - 1; i++) cache_size *= Block;
 
@@ -212,7 +214,7 @@ void cusz::impl::VerifyHuffman(
     // TODO error handling from invalid read
     // cout << log_info << "Redo PdQ just to get quantization dump." << endl;
 
-    auto  data   = io::ReadBinaryFile<Data>(ctx->get_fname(), m->len);
+    auto  data   = io::ReadBinaryToNewArray<Data>(ctx->get_fname(), m->len);
     Data* d_data = mem::CreateDeviceSpaceAndMemcpyFromHost(data, m->len);
     auto  d_q    = mem::CreateCUDASpace<Quant>(m->len);
 
@@ -222,7 +224,7 @@ void cusz::impl::VerifyHuffman(
 
     {  // Lorenzo
         void*  args[] = {&d_m, &d_data, &d_q};
-        dim3   grid_dim(m->nb0, m->nb1, m->nb2), block_dim(m->b0, m->b1, m->b2);
+        dim3   grid_dim(m->nb0, m->nb1, m->nb2), block_dim(m->b, m->b, m->b);
         size_t cache_size = Block;
         for (auto i = 0; i < m->ndim - 1; i++) cache_size *= Block;
 
@@ -292,37 +294,3 @@ void cusz::impl::VerifyHuffman(
     delete[] veri_q, delete[] data;
     // end of if count
 }
-
-typedef MetadataTrait<1>::metadata_t m1_t;
-typedef MetadataTrait<2>::metadata_t m2_t;
-typedef MetadataTrait<3>::metadata_t m3_t;
-
-typedef QuantTrait<1>::Quant q1_t;
-typedef QuantTrait<2>::Quant q2_t;
-
-typedef float  fp32;
-typedef double fp64;
-
-// ndim, Data, QuantByte, HuffByte
-template void cusz::interface::Compress2<1, fp32, 1, 4>(ctx_t*, m1_t*);
-template void cusz::interface::Compress2<1, fp32, 2, 4>(ctx_t*, m1_t*);
-template void cusz::interface::Compress2<2, fp32, 1, 4>(ctx_t*, m2_t*);
-template void cusz::interface::Compress2<2, fp32, 2, 4>(ctx_t*, m2_t*);
-template void cusz::interface::Compress2<3, fp32, 1, 4>(ctx_t*, m3_t*);
-template void cusz::interface::Compress2<3, fp32, 3, 4>(ctx_t*, m3_t*);
-
-// int ndim, typename Data, int QuantByte, int HuffByte
-template void cusz::interface::Decompress2<1, fp32, 1, 4>(ctx_t*, m1_t*);
-template void cusz::interface::Decompress2<1, fp32, 2, 4>(ctx_t*, m1_t*);
-template void cusz::interface::Decompress2<2, fp32, 1, 4>(ctx_t*, m2_t*);
-template void cusz::interface::Decompress2<2, fp32, 2, 4>(ctx_t*, m2_t*);
-template void cusz::interface::Decompress2<3, fp32, 1, 4>(ctx_t*, m3_t*);
-template void cusz::interface::Decompress2<3, fp32, 2, 4>(ctx_t*, m3_t*);
-
-// template <int ndim, typename Data, int QuantByte>
-template void cusz::impl::VerifyHuffman<1, fp32, 1>(ctx_t*, m1_t*, q1_t*);
-template void cusz::impl::VerifyHuffman<1, fp32, 2>(ctx_t*, m1_t*, q2_t*);
-template void cusz::impl::VerifyHuffman<2, fp32, 1>(ctx_t*, m2_t*, q1_t*);
-template void cusz::impl::VerifyHuffman<2, fp32, 2>(ctx_t*, m2_t*, q2_t*);
-template void cusz::impl::VerifyHuffman<3, fp32, 1>(ctx_t*, m3_t*, q1_t*);
-template void cusz::impl::VerifyHuffman<3, fp32, 2>(ctx_t*, m3_t*, q2_t*);
