@@ -77,5 +77,11 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc | $(OBJ_DIR)
 $(CUOBJS): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu | $(OBJ_DIR)
 	$(NVCC) $(NVCCFLAGS) -c $< -o $@
 
+
+refactor:
+	nvcc -std=c++14 -c src/impl_dualquant.cu
+	nvcc -std=c++14 -c src/impl_mem.cu
+	nvcc -std=c++14 -c src/impl_workflow2.cu
+
 clean:
 	$(RM) $(OBJS)

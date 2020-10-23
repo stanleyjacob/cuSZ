@@ -19,8 +19,8 @@ struct MetadataTrait;
 
 template <>
 struct MetadataTrait<1> {
-    typedef struct Metadata<32> metadata_t;
-    static const int            Block = 32;
+    typedef struct Metadata<256> metadata_t;
+    static const int             Block = 256;
 };
 
 // template <>
@@ -54,5 +54,18 @@ template <> struct CodebookTrait<8> {typedef unsigned long long Huff;};
 template <int HuffByte> struct HuffTrait;
 template <> struct HuffTrait<4> {typedef unsigned long Huff;};
 template <> struct HuffTrait<8> {typedef unsigned long long Huff;};
+
+typedef MetadataTrait<1>::metadata_t m1_t;
+typedef MetadataTrait<2>::metadata_t m2_t;
+typedef MetadataTrait<3>::metadata_t m3_t;
+
+typedef QuantTrait<1>::Quant q1_t;
+typedef QuantTrait<2>::Quant q2_t;
+
+typedef float  fp32;
+typedef double fp64;
+
+typedef int8_t  int8__t;
+typedef uint8_t uint8__t;
 
 #endif
