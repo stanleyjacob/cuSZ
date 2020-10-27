@@ -151,7 +151,7 @@ void cusz::interface::DryRun(Data* d, Data* d_d, string fi, size_t* dims, double
     cudaDeviceSynchronize();
     cudaMemcpy(d, d_d, len * sizeof(Data), cudaMemcpyDeviceToHost);
 
-    auto d2 = io::ReadBinaryFile<Data>(fi, len);
+    auto d2 = io::ReadBinaryToNewArray<Data>(fi, len);
     // CR is not valid in dry run
     analysis::VerifyData<Data>(d, d2, len, false, ebs[EB], 0);
     cout << log_info << "Dry-run finished, exit..." << endl;

@@ -82,6 +82,26 @@ refactor:
 	nvcc -std=c++14 -c src/impl_dualquant.cu
 	nvcc -std=c++14 -c src/impl_mem.cu
 	nvcc -std=c++14 -c src/impl_workflow2.cu
+	nvcc -std=c++14 -c src/lorenzo_trait.cu
+	nvcc -std=c++14 -c src/histogram.cu
+	nvcc -std=c++14 -c src/par_huffman.cu --expt-relaxed-constexpr -rdc=true
+	nvcc -std=c++14 -c src/par_huffman_sortbyfreq.cu
+	nvcc -std=c++14 -c src/par_merge.cu
+	# nvcc -std=c++14 -c src/serial_huffman.cu
+	nvcc -std=c++14 -c src/cusz_dryrun.cu
+	nvcc -std=c++14 -c src/huffman_codec.cu
+	nvcc -std=c++14 -c src/gather_scatter.cu
+	nvcc -std=c++14 -c src/filter.cu
+	g++ -std=c++14 -c  src/argparse2.cc
+	g++ -std=c++14 -c  src/src/argparse2_cusz.cc
+	g++ -std=c++14 -c  src/argparse2_cusz.cc
+	g++ -std=c++14 -c  src/argparse2_doc.cc
+	g++ -std=c++14 -c  src/argparse2_huff.cc
+	g++ -std=c++14 -c  src/format.cc
+	g++ -std=c++14 -c  src/metadata
+	g++ -std=c++14 -c  src/metadata.cc
+	g++ -std=c++14 -c  src/types.cc
+	g++ -std=c++14 -c  src/verify.cc
 
 clean:
 	$(RM) $(OBJS)
