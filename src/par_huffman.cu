@@ -509,7 +509,8 @@ void lossless::par_huffman::ParGetCodebook(
     cudaGetDevice(&device_id);
     cudaGetDeviceProperties(&deviceProp, device_id);
     cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &cg_blocks_sm, parHuff::GPU_GenerateCL<unsigned int>, mthreads, 5 * sizeof(int32_t) + 32 * sizeof(int32_t));
+        &cg_blocks_sm, lossless::par_huffman::GPU_GenerateCL<unsigned int>, mthreads,
+        5 * sizeof(int32_t) + 32 * sizeof(int32_t));
     cg_mblocks = deviceProp.multiProcessorCount * cg_blocks_sm;
 
     int ELTS_PER_SEQ_MERGE = 16;
