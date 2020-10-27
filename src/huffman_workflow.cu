@@ -217,9 +217,9 @@ lossless::interface::HuffmanEncode(string& f_in, Quant* d_in, size_t len, int ch
     io::WriteArrayToBinary(f_in + ".hbyte", h, total_uInts);
     // to save first, entry and keys
     io::WriteArrayToBinary(
-        f_in + ".canon",                                   //
-        reinterpret_cast<uint8_t*>(decode_meta),           //
-        sizeof(H) * (2 * type_bw) + sizeof(Q) * dict_size  // first, entry, reversed dict (keys)
+        f_in + ".canon",                                        //
+        reinterpret_cast<uint8_t*>(decode_meta),                //
+        sizeof(Huff) * (2 * type_bw) + sizeof(Quant) * cb_size  // first, entry, reversed dict (keys)
     );
 
     size_t metadata_size = (2 * n_chunk) * sizeof(decltype(h_meta))                   //
@@ -249,14 +249,14 @@ Quant* lossless::interface::HuffmanDecode(
 {
     auto type_bw         = sizeof(Huff) * 8;
     auto canon_meta      = sizeof(Huff) * (2 * type_bw) + sizeof(Quant) * dict_size;
-    auto canon_singleton = io::ReadBinaryFile<uint8_t>(f_bcode_base + ".canon", canon_meta);
+    auto canon_singleton = io::ReadBinaryToNewArray<uint8_t>(f_bcode_base + ".canon", canon_meta);
     cudaDeviceSynchronize();
 
-    auto n_chunk  = (len - 1) / chunk_size + 1;
-    auto hcode    = io::ReadBinaryFile<H>(f_bcode_base + ".hbyte", total_uInts);
-    auto dH_meta  = io::ReadBinaryFile<size_t>(f_bcode_base + ".hmeta", 2 * n_chunk);
-    auto blockDim = tBLK_DEFLATE;  // the same as deflating
-    auto gridDim  = (n_chunk - 1) / blockDim + 1;
+    auto n_chunk   = (len - 1) / chunk_size + 1;
+    auto hcode     = io::ReadBinaryToNewArray<Huff>(f_bcode_base + ".hbyte", total_uInts);
+    auto dH_meta   = io::ReadBinaryToNewArray<size_t>(f_bcode_base + ".hmeta", 2 * n_chunk);
+    auto block_dim = tBLK_DEFLATE;  // the same as deflating
+    auto grid_dim  = (n_chunk - 1) / block_dim + 1;
 
     auto d_xbcode          = mem::CreateCUDASpace<Quant>(len);
     auto d_dHcode          = mem::CreateDeviceSpaceAndMemcpyFromHost(hcode, total_uInts);
