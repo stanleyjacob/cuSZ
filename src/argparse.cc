@@ -6,7 +6,7 @@
  * @date 2020-09-20
  * Created on: 20-04-24
  *
- * @copyright Copyright (c) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
+ * @copyright (C) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
  * See LICENSE in top-level directory
  *
  */
@@ -310,9 +310,14 @@ ArgPack::cuszFullDoc()
         "                _binning_  Downsampling datum by 2x2 to 1.\n"
         "\n"
         "    *Demonstration*\n"
-        "        *-h* or *--help*   Get help documentation.\n"
+        "        *-h* or *--help*\n"
+        "                Get help documentation.\n"
         "\n"
-        "        *-M* or *--meta*   Get archive metadata. (TODO)\n"
+        "        *-V* or *--verbose*\n"
+        "                Print host and device information for diagnostics.\n"
+        "\n"
+        "        *-M* or *--meta*\n"
+        "                Get archive metadata. (TODO)\n"
         "\n"
         "        *-D* or *--demo* [demo-dataset]\n"
         "                Use demo dataset, will omit given dimension(s). Supported datasets include:\n"
