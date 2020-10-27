@@ -3,10 +3,10 @@
  * @author Jiannan Tian, Cody Rivera (cjrivera1@crimson.ua.edu)
  * @brief Workflow of Huffman coding.
  * @version 0.1
- * @date 2020-09-21
+ * @date 2020-10-24
  * Created on 2020-04-24
  *
- * @copyright Copyright (c) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
+ * @copyright (C) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
  * See LICENSE in top-level directory
  *
  */
@@ -15,6 +15,7 @@
 
 #include <sys/stat.h>
 #include <unistd.h>
+#include <algorithm>
 #include <bitset>
 #include <cassert>
 #include <cmath>
@@ -50,11 +51,16 @@ void lossless::wrap::GetFrequency(UInt* d_data, size_t len, Freq* d_freq, int nu
     // Initialize to device-specific values
     int deviceId;
     int maxbytes;
+    int maxbytesOptIn;
     int numSMs;
 
     cudaGetDevice(&deviceId);
-    cudaDeviceGetAttribute(&maxbytes, cudaDevAttrMaxSharedMemoryPerMultiprocessor, deviceId);
+    cudaDeviceGetAttribute(&maxbytes, cudaDevAttrMaxSharedMemoryPerBlock, deviceId);
     cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, deviceId);
+
+    // Account for opt-in extra shared memory on certain architectures
+    cudaDeviceGetAttribute(&maxbytesOptIn, cudaDevAttrMaxSharedMemoryPerBlockOptin, deviceId);
+    maxbytes = std::max(maxbytes, maxbytesOptIn);
 
     // Optimize launch
     int numBuckets     = num_bins;
@@ -196,11 +202,12 @@ lossless::interface::HuffmanEncode(string& f_in, Quant* d_in, size_t len, int ch
 
     cout << log_dbg;
     printf(
-        "Huffman bitstream: %lu chunks of size = %d, in %lu uint%lus or %lu bits\n", n_chunk, chunk_size, total_uInts,
-        sizeof(Huff) * 8, total_bits);
+        "Huffman enc:\t#chunk=%lu, chunksze=%d => %lu %d-byte words/%lu bits\n", n_chunk, chunk_size, total_uInts,
+        (int)sizeof(Huff), total_bits);
 
     // print densely metadata
-    lossless::util::PrintChunkHuffmanCoding<Huff>(dH_bit_meta, dH_uInt_meta, len, chunk_size, total_bits, total_uInts);
+    // lossless::util::PrintChunkHuffmanCoding<Huff>(dH_bit_meta, dH_uInt_meta, len, chunk_size, total_bits,
+    // total_uInts);
 
     // copy back densely Huffman code in units of uInt (regarding endianness)
     auto h = new Huff[total_uInts]();
@@ -226,7 +233,6 @@ lossless::interface::HuffmanEncode(string& f_in, Quant* d_in, size_t len, int ch
                            + sizeof(Huff) * (2 * type_bw) + sizeof(Quant) * cb_size;  // uint8_t
 
     //////// clean up
-    cudaFree(d_in);
     cudaFree(d_freq);
     cudaFree(d_canon_cb);
     cudaFree(d_decode_meta);
