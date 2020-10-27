@@ -15,7 +15,9 @@ huff
 *.hmeta
 *.canon
 *.outlier
-*.BN
+
+*.quant
+*.sz
 
 *.canonized
 

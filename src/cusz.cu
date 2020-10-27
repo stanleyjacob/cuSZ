@@ -3,7 +3,7 @@
  * @author Jiannan Tian
  * @brief Driver program of cuSZ.
  * @version 0.1
- * @date 2020-09-21
+ * @date 2020-09-20
  * Created on 2019-12-30
  *
  * @copyright (C) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
