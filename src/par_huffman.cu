@@ -5,14 +5,15 @@
  *        Based on [Ostadzadeh et al. 2007] (https://dblp.org/rec/conf/pdpta/OstadzadehEZMB07.bib)
  *        "A Two-phase Practical Parallel Algorithm for Construction of Huffman Codes".
  * @version 0.1
- * @date 2020-09-21
+ * @date 2020-10-24
  * Created on: 2020-05
  *
- * @copyright Copyright (c) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
+ * @copyright (C) 2020 by Washington State University, The University of Alabama, Argonne National Laboratory
  * See LICENSE in top-level directory
  *
  */
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -499,11 +500,34 @@ void lossless::par_huffman::ParGetCodebook(
     cudaMemset(CL, 0,         nz_dict_size * sizeof(int)          );
     // clang-format on
 
-    // Merge configuration -- Change for V100
-    int ELTS_PER_SEQ_MERGE = 16;
+    // Grid configuration for CL -- based on Cooperative Groups
+    int            cg_mblocks;
+    int            cg_blocks_sm;
+    int            device_id;
+    int            mthreads = 32;  // 1 warp
+    cudaDeviceProp deviceProp;
+    cudaGetDevice(&device_id);
+    cudaGetDeviceProperties(&deviceProp, device_id);
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &cg_blocks_sm, lossless::par_huffman::GPU_GenerateCL<unsigned int>, mthreads,
+        5 * sizeof(int32_t) + 32 * sizeof(int32_t));
+    cg_mblocks = deviceProp.multiProcessorCount * cg_blocks_sm;
 
-    int       mblocks  = (nz_dict_size / ELTS_PER_SEQ_MERGE) + 1;
-    int       mthreads = 32;
+    int ELTS_PER_SEQ_MERGE = 16;
+    int mblocks            = std::min(cg_mblocks, (nz_dict_size / ELTS_PER_SEQ_MERGE) + 1);
+
+    // Exit if not enough exposed parallelism -- TODO modify kernels so this is unneeded
+    int tthreads = mthreads * mblocks;
+    if (tthreads < nz_dict_size) {
+        cout << log_err << "Insufficient on-device parallelism to construct a " << nz_dict_size
+             << " non-zero item codebook" << endl;
+        cout << log_err << "Provided parallelism: " << mblocks << " blocks, " << mthreads << " threads, " << tthreads
+             << " total" << endl
+             << endl;
+        cout << log_err << "Exiting cuSZ ..." << endl;
+        exit(1);
+    }
+
     uint32_t* diagonal_path_intersections;
     cudaMalloc(&diagonal_path_intersections, (2 * (mblocks + 1)) * sizeof(uint32_t));
 
@@ -536,7 +560,7 @@ void lossless::par_huffman::ParGetCodebook(
     impl::GPU_GetMaxCWLength<<<1, 1>>>(CL, nz_dict_size, d_max_CL);
     cudaDeviceSynchronize();
     cudaMemcpy(&max_CL, d_max_CL, sizeof(unsigned int), cudaMemcpyDeviceToHost);
-    cudaFree(d_first_nonzero_index);
+    cudaFree(d_max_CL);
 
     int max_CW_bits = (sizeof(Huff) * 8) - 8;
     if (max_CL > max_CW_bits) {
@@ -544,6 +568,22 @@ void lossless::par_huffman::ParGetCodebook(
         cout << log_err << "Huffman codeword representation requires at least " << max_CL + 8
              << " bits (longest codeword: " << max_CL << " bits)" << endl;
         cout << log_err << "(Consider running with -H 64)" << endl << endl;
+        cout << log_err << "Exiting cuSZ ..." << endl;
+        exit(1);
+    }
+
+    // Configure CW for 1024 threads/block
+    int cg_cw_mblocks = (cg_mblocks * mthreads) / 1024;
+    int cw_mblocks    = std::min(cg_cw_mblocks, nz_nblocks);
+
+    // Exit if not enough exposed parallelism -- TODO modify kernels so this is unneeded
+    int cw_tthreads = cw_mblocks * 1024;
+    if (cw_tthreads < nz_dict_size) {
+        cout << log_err << "Insufficient on-device parallelism to construct a " << nz_dict_size
+             << " non-zero item codebook" << endl;
+        cout << log_err << "Provided parallelism: " << cw_mblocks << " blocks, " << 1024 << " threads, " << cw_tthreads
+             << " total" << endl
+             << endl;
         cout << log_err << "Exiting cuSZ ..." << endl;
         exit(1);
     }
@@ -558,7 +598,7 @@ void lossless::par_huffman::ParGetCodebook(
     // Call second kernel
     cudaLaunchCooperativeKernel(
         (void*)lossless::par_huffman::GPU_GenerateCW<unsigned int, Huff>,  //
-        nz_nblocks,                                                        //
+        cw_mblocks,                                                        //
         1024,                                                              //
         CW_Args);
     cudaDeviceSynchronize();

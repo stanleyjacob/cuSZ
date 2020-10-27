@@ -8,7 +8,7 @@
  * ACM International Conference on Supercomputing 2012
  * June 25-29 2012, San Servolo, Venice, Italy
  *
- * Copyright (c) 2012 Georgia Institute of Technology
+ * (C) 2012 Georgia Institute of Technology
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,10 +38,10 @@
 
 /**
  * @file par_merge.cu
- * @author Oded Green (ogreen@gatech.edu), Rob McColl (robert.c.mccoll@gmail.com)
+ * @author Oded Green (ogreen@gatech.edu), Rob McColl (robert.c.mccoll@gmail.com))
  * @brief Modified and adapted by Cody Rivera
  * @version 0.1
- * @date 2020-09-21
+ * @date 2020-10-24
  * Created on: 2020-06
  *
  */
@@ -72,9 +72,9 @@ using namespace cooperative_groups;
 // clang-format off
 template <typename F>
 __device__ void parMerge(
-    F* copyFreq,   int* copyIndex, int* copyIsLeaf, int  cStart,     int cEnd,
-    F* iNodesFreq, int  iStart,    int  iEnd,       int  iNodesCap,  
-    F* tempFreq,   int* tempIndex, int* tempIsLeaf, int& tempLength, 
+    F* copyFreq,    int* copyIndex,  int* copyIsLeaf,   int  cStart,    int cEnd,
+    F* iNodesFreq,  int  iStart,     int  iEnd,         int  iNodesCap,
+    F* tempFreq,    int* tempIndex,  int* tempIsLeaf,   int& tempLength,
     uint32_t* diagonal_path_intersections, int blocks,  int  threads,
     /* Shared Memory */
     int32_t& x_top, int32_t& y_top,  int32_t& x_bottom, int32_t& y_bottom,
@@ -167,8 +167,8 @@ __device__ void cudaWorkloadDiagonals(
             if (getfrom_y >= iNodesCap) getfrom_y -= iNodesCap;
 
             // Are we a '1' or '0' with respect to A[x] <= B[x]
-            if (current_x > A_length or current_y < 0) { oneorzero[threadIdx.x] = 0; }
-            else if (current_y >= B_length || current_x < 1) {
+            if (current_x > (int32_t)A_length or current_y < 0) { oneorzero[threadIdx.x] = 0; }
+            else if (current_y >= (int32_t)B_length || current_x < 1) {
                 oneorzero[threadIdx.x] = 1;
             }
             else {
@@ -309,8 +309,6 @@ __device__ void cudaMergeSinglePath(
         }
     }
 }
-
-///
 
 // `unsigned int` instantiations
 template __device__ void parMerge<unsigned int>(
