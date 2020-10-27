@@ -205,7 +205,8 @@ lossless::interface::HuffmanEncode(string& f_in, Quant* d_in, size_t len, int ch
         (int)sizeof(Huff), total_bits);
 
     // print densely metadata
-    // lossless::util::PrintChunkHuffmanCoding<H>(dH_bit_meta, dH_uInt_meta, len, chunk_size, total_bits, total_uInts);
+    // lossless::util::PrintChunkHuffmanCoding<Huff>(dH_bit_meta, dH_uInt_meta, len, chunk_size, total_bits,
+    // total_uInts);
 
     // copy back densely Huffman code in units of uInt (regarding endianness)
     // TODO reinterpret_cast
