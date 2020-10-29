@@ -19,7 +19,6 @@ huff
 
 *.canonized
 
-
 data/4lossless
 
 cmake-build-debug
@@ -27,8 +26,10 @@ cmake-build-release
 build/
 CMakeFiles
 
+*.o
 src/*.dylib
 src/*.o
+test/*.o
 
 *.swp
 .DS_Store

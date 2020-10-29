@@ -30,6 +30,7 @@ endif
 
 CCFLAGS   := $(STD) -O3
 NVCCFLAGS := $(STD) $(DEPLOY) --expt-relaxed-constexpr
+NVCCFLAGS_HUFF := $(STD) $(DEPLOY)
 
 CCFILES_OMP:=$(SRC_DIR)/analysis_utils.cc
 CCFILES   := $(filter-out $(CCFILES_OMP), $(wildcard $(SRC_DIR)/*.cc))
@@ -81,16 +82,16 @@ huff: $(HUFF_DIR)/huff.cu $(SRC_DIR)/argparse.cc
 	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huff.cu -o huff
 # nvcc huff.cu ../argparse.o ../constants.o ../cuda_mem.o ../huffman_workflow.o ../types.o ../format.o ../histogram.o ../huffman.o ../canonical.o ../huffman_codec.o -gencode=arch=compute_75,code=sm_75
 
-huffre: $(HUFF_DIR)/reduce_move_merge.cuh $(HUFF_DIR)/huffre.cu
-	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huffre.cu -o huffre
+huffre: $(HUFF_DIR)/rs_merge.cuh $(HUFF_DIR)/huffre.cu
+	$(NVCC) $(NVCCFLAGS_HUFF) $(DEPS_HUFF) $(HUFF_DIR)/huffre.cu -o huffre
 
-huffretime: $(HUFF_DIR)/reduce_move_merge.cuh $(HUFF_DIR)/huffre-demo.cu
-	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huffre.cu -o huffre-reduce1  -DREDUCE1TIME
-	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huffre.cu -o huffre-reduce12 -DREDUCE12TIME
-	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huffre.cu -o huffre-allmerge -DALLMERGETIME 
+huffretime: $(HUFF_DIR)/rs_merge.cuh $(HUFF_DIR)/huffre.cu
+	$(NVCC) $(NVCCFLAGS_HUFF) $(DEPS_HUFF) $(HUFF_DIR)/huffre.cu -o huffre-reduce1  -DREDUCE1TIME
+	$(NVCC) $(NVCCFLAGS_HUFF) $(DEPS_HUFF) $(HUFF_DIR)/huffre.cu -o huffre-reduce12 -DREDUCE12TIME
+	$(NVCC) $(NVCCFLAGS_HUFF) $(DEPS_HUFF) $(HUFF_DIR)/huffre.cu -o huffre-allmerge -DALLMERGETIME 
 
-huffredbg: $(HUFF_DIR)/reduce_move_merge.cuh $(HUFF_DIR)/huffre-demo.cu
-	$(NVCC) $(NVCCFLAGS) $(CUDA_DBG) $(DEPS_HUFF) $(HUFF_DIR)/huffre.cu -o huffre-dbg -DDBG0,DBG1,DBG2
+huffredbg: $(HUFF_DIR)/rs_merge.cuh $(HUFF_DIR)/huffre.cu
+	$(NVCC) $(NVCNVCCFLAGS_HUFFCFLAGS) $(CUDA_DBG) $(DEPS_HUFF) $(HUFF_DIR)/huffre.cu -o huffre-dbg -DDBG0,DBG1,DBG2
 
 >>>>>>> add "Huffman (re)"
 install: bin/cusz
