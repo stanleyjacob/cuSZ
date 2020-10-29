@@ -51,7 +51,7 @@ typedef struct ArgPack {
     bool   use_demo;
     bool   verbose;
     bool   to_verify;
-    bool   verify_huffman;
+    bool   do_verify_huffman;
     bool   skip_huffman, skip_writex;
     bool   pre_binning;
 

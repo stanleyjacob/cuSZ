@@ -48,8 +48,8 @@ void PackMetadata(argpack* ap, metadata_pack* mp, int& nnz, size_t* dim_array, d
 
     mp->nnz = nnz;
 
-    if (ap->dtype == "f32") mp->dtype = DataType::kF32;
-    if (ap->dtype == "f64") mp->dtype = DataType::kF64;
+    if (ap->dtype == "fp32" or ap->dtype == "f4") mp->dtype = DataType::kF32;
+    if (ap->dtype == "fp64" or ap->dtype == "f8") mp->dtype = DataType::kF64;
 
     mp->quant_rep     = ap->quant_rep;
     mp->huffman_rep   = ap->huffman_rep;
@@ -66,8 +66,8 @@ void UnpackMetadata(argpack* ap, metadata_pack* mp, int& nnz, size_t* dim_array,
 
     nnz = mp->nnz;
 
-    if (mp->dtype == DataType::kF32) ap->dtype = "f32";
-    if (mp->dtype == DataType::kF64) ap->dtype = "f64";
+    if (mp->dtype == DataType::kF32) ap->dtype = "fp32";
+    if (mp->dtype == DataType::kF64) ap->dtype = "fp64";
 
     ap->quant_rep     = mp->quant_rep;
     ap->huffman_rep   = mp->huffman_rep;

@@ -1,7 +1,7 @@
 all: 
 	@$(MAKE) psz -j
 	@echo "---------------------------------------------------------------------------------------"
-	@echo "Regardless, you can try \"./psz2d r2r 1 -4 yesblk dq cesm ../../data/sample-cesm-CLDHGH\""
+	@echo "Regardless, you can try \"./psz2d r2r 1 -4 yesblk dq cesm ../../data/ex-cesm-CLDHGH\""
 	@echo "---------------------------------------------------------------------------------------"
 
 OBJ_TO_LINK := ../constants.o ../SDRB.o ../types.o ../format.o ../verify.o

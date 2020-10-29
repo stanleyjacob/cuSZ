@@ -466,7 +466,7 @@ ArgPack::ArgPack(int argc, char** argv, bool huffman)
                     break;
                 case 'V':
                 _VERIFY:
-                    verify_huffman = true;  // TODO verify huffman in workflow
+                    do_verify_huffman = true;  // TODO verify huffman in workflow
                     break;
                 case 'r':
                 _DRY_RUN:
@@ -584,27 +584,27 @@ ArgPack::ArgPack(int argc, char** argv)
         exit(0);
     }
     // default values
-    dict_size      = 1024;
-    quant_rep      = 16;
-    huffman_rep    = 32;
-    huffman_chunk  = 512;
-    n_dim          = -1;
-    d0             = 1;
-    d1             = 1;
-    d2             = 1;
-    d3             = 1;
-    mantissa       = 1.23;
-    exponent       = -4.56;
-    to_archive     = false;
-    to_extract     = false;
-    use_demo       = false;
-    verbose        = false;
-    to_verify      = false;
-    verify_huffman = false;
-    skip_huffman   = false;
-    skip_writex    = false;
-    pre_binning    = false;
-    to_dryrun      = false;
+    dict_size         = 1024;
+    quant_rep         = 16;
+    huffman_rep       = 32;
+    huffman_chunk     = 512;
+    n_dim             = -1;
+    d0                = 1;
+    d1                = 1;
+    d2                = 1;
+    d3                = 1;
+    mantissa          = 1.23;
+    exponent          = -4.56;
+    to_archive        = false;
+    to_extract        = false;
+    use_demo          = false;
+    verbose           = false;
+    to_verify         = false;
+    do_verify_huffman = false;
+    skip_huffman      = false;
+    skip_writex       = false;
+    pre_binning       = false;
+    to_dryrun         = false;
 
     opath = "";
 
@@ -851,7 +851,7 @@ ArgPack::ArgPack(int argc, char** argv)
                 _VERIFY:
                     if (i + 1 <= argc) {
                         string veri(argv[++i]);
-                        if (veri.find("huffman") != std::string::npos) verify_huffman = true;
+                        if (veri.find("huffman") != std::string::npos) do_verify_huffman = true;
                         // TODO verify data quality
                     }
                     break;

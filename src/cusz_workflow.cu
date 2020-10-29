@@ -324,7 +324,7 @@ void cusz::interface::Decompress(
         cout << log_info << "Huffman decoding into quant.code." << endl;
         xq = lossless::interface::HuffmanDecode<Quant, Huff>(
             ap->cx_path2file, len, ap->huffman_chunk, total_uInt, dict_size);
-        if (ap->verify_huffman) {
+        if (ap->do_verify_huffman) {
             // TODO check in argpack
             if (ap->x_fi_origin == "") {
                 cerr << log_err << "use \"--orogin /path/to/origin_data\" to specify the original dataum." << endl;

@@ -40,15 +40,15 @@ void HuffmanArgParser::parse(int argc, char** argv)
                     // workflow
                 case 'e':
                 WF_ENC:
-                    wf_enc = true;
+                    DO_enc = true;
                     break;
                 case 'd':
                 WF_DEC:
-                    wf_dec = true;
+                    DO_dec = true;
                     break;
                 case 'r':
                 WF_DRYRUN:
-                    wf_dryrun = true;
+                    DO_dryrun = true;
                     break;
 
                     // dimension
@@ -92,15 +92,15 @@ void HuffmanArgParser::parse(int argc, char** argv)
                 // input datum file
                 case 'i':
                 INPUT:
-                    if (i + 1 <= argc) { fname = string(argv[++i]); }
+                    if (i + 1 <= argc) fname = string(argv[++i]);
                     break;
                 case 'R':
                 REP_D:
-                    if (i + 1 <= argc) rep_d = str2int(argv[++i]);
+                    if (i + 1 <= argc) dict_byte = str2int(argv[++i]);
                     break;
                 case 'H':
                 REP_H:
-                    if (i + 1 <= argc) rep_h = str2int(argv[++i]);
+                    if (i + 1 <= argc) huff_byte = str2int(argv[++i]);
                     break;
                 case 'C':
                 CHUNKSIZE:
@@ -144,17 +144,17 @@ HuffmanArgParser::HuffmanArgParser(int argc, char** argv)
         exit(0);
     }
     // default values
-    cb_len = 1024;
-    rep_d  = 16;
-    len    = -1;  // TODO argcheck
-    rep_h  = 32;
-    chunk  = 512;
+    cb_len    = 1024;
+    dict_byte = 16;
+    len       = -1;  // TODO argcheck
+    huff_byte = 4;
+    chunk     = 512;
 
     ndim = -1, d0 = 1, d1 = 1, d2 = 1, d3 = 1;
 
-    wf_enc    = false;
-    wf_dec    = false;
-    wf_dryrun = false;  // TODO dry run is meaningful differently for cuSZ and Huffman
+    DO_enc    = false;
+    DO_dec    = false;
+    DO_dryrun = false;  // TODO dry run is meaningful differently for cuSZ and Huffman
 
     parse(argc, argv);
 
@@ -183,33 +183,33 @@ void HuffmanArgParser::CheckArgs()
         cerr << log_err << "Wrong input size(s)!" << endl;
         to_abort = true;
     }
-    if (!wf_enc and !wf_dec and !wf_dryrun) {
+    if (!DO_enc and !DO_dec and !DO_dryrun) {
         cerr << log_err << "Select encode (-a), decode (-x) or dry-run (-r)!" << endl;
         to_abort = true;
     }
 
-    if (rep_d == 8) {  // TODO
+    if (dict_byte == 1) {  // TODO
         assert(cb_len <= 256);
     }
-    else if (rep_d == 16) {
+    else if (dict_byte == 2) {
         assert(cb_len <= 65536);
     }
 
-    if (wf_dryrun and wf_enc and wf_dec) {
+    if (DO_dryrun and DO_enc and DO_dec) {
         cerr << log_warn << "No need to dry-run, encode and decode at the same time!" << endl;
         cerr << log_warn << "Will dry run only." << endl << endl;
-        wf_enc = false;
-        wf_dec = false;
+        DO_enc = false;
+        DO_dec = false;
     }
-    else if (wf_dryrun and wf_enc) {
+    else if (DO_dryrun and DO_enc) {
         cerr << log_warn << "No need to dry-run and encode at the same time!" << endl;
         cerr << log_warn << "Will dry run only." << endl << endl;
-        wf_enc = false;
+        DO_enc = false;
     }
-    else if (wf_dryrun and wf_dec) {
+    else if (DO_dryrun and DO_dec) {
         cerr << log_warn << "No need to dry-run and decode at the same time!" << endl;
         cerr << log_warn << "Will dry run only." << endl << endl;
-        wf_dec = false;
+        DO_dec = false;
     }
 
     if (to_abort) {

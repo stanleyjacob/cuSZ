@@ -76,10 +76,11 @@ int main(int argc, char** argv)
         dim_array = ap->use_demo ? InitializeDemoDims(ap->demo_dataset, ap->dict_size)  //
                                  : InitializeDims(ap->dict_size, ap->n_dim, ap->d0, ap->d1, ap->d2, ap->d3);
 
+        // TODO not only float/double
         cout << log_info;
         printf(
             "datum:\t\t%s (%lu bytes) of type %s\n", ap->cx_path2file.c_str(),
-            dim_array[LEN] * (ap->dtype == "f32" ? sizeof(float) : sizeof(double)), ap->dtype.c_str());
+            dim_array[LEN] * (ap->dtype == "fp32" ? sizeof(float) : sizeof(double)), ap->dtype.c_str());
 
         auto eb_config = new config_t(ap->dict_size, ap->mantissa, ap->exponent);
         if (ap->mode == "r2r")

@@ -14,10 +14,10 @@
 
 #include "argparse2.hh"
 
-class HuffmanArgParser : ArgParser {
+class HuffmanArgParser : public ArgParser {
    private:
-    bool wf_enc;
-    bool wf_dec;
+    bool DO_enc;
+    bool DO_dec;
     int  chunk;
 
     virtual void parse(int argc, char** argv);
