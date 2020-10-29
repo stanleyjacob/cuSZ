@@ -15,13 +15,14 @@
 
 #include "../cuda_error_handling.cuh"
 #include "../cuda_mem.cuh"
+#include "../cuda_utils.cuh"
 #include "../huffman_codec.cuh"
 #include "../huffman_workflow.cuh"
 #include "../timer.hh"
 #include "../types.hh"
 
-#include "reduce_move_merge.cuh"
-#include "utils.cuh"
+#include "rs_merge.cuh"
+#include "utils.hh"
 
 using std::cerr;
 using std::cout;
@@ -100,45 +101,58 @@ int submain()
 
     double avg_bw, entropy;
 
-    std::tie(avg_bw, entropy) = get_avgbw_entropy<Input, Dict>(q, len, cb, cb_len);
+    std::tie(avg_bw, entropy) = GetEntropyAndAvgBitwidth<Input, Dict>(q, len, cb, cb_len);
 
-    dbg_bi = 0;   // debug only
+    dbg_bi = 0;  // debug only
 
-	const auto ShuffleFactor   = Magnitude - ReductionFactor;
-   	cout << log_info << "Magnitude=" << Magnitude << "\tReductionFactor=" << ReductionFactor
-   		 << "\tShuffleFactor=" << ShuffleFactor << endl;
-	Encoder<Input, Huff, Dict, Magnitude, ReductionFactor, ShuffleFactor>         // reduce shuffle
-    	(q, len, cb, cb_len, dummy_nchunk, string("reduce-shuffle"), dummy_nchunk != 0);  //
+    const auto ShuffleFactor = Magnitude - ReductionFactor;
+    cout << log_info << "Magnitude=" << Magnitude << "\tReductionFactor=" << ReductionFactor
+         << "\tShuffleFactor=" << ShuffleFactor << endl;
+    Encoder<Input, Huff, Dict, Magnitude, ReductionFactor, ShuffleFactor>                 // reduce shuffle
+        (q, len, cb, cb_len, dummy_nchunk, string("reduce-shuffle"), dummy_nchunk != 0);  //
 
     delete[] q, cb;
     return 0;
 }
 
-int main(int argc, char** argv) {
-	if (argc < 3) {
-		cout << "./<prog> <chunk magnitude> <reduction times>" << endl;
-		exit(1);
-	}
-	int mag = atoi(argv[1]);
-	int red = atoi(argv[2]);
-	if (mag ==  12) {
-		if (red == 4)  submain<12, 4>();
-		else if (red == 3)  submain<12, 3>();
-		else if (red == 2)  submain<12, 2>();
-		else if (red == 1)  submain<12, 1>();
-	}
-	else if (mag ==  11) {
-		if (red == 4)  submain<11, 4>();
-		else if (red == 3)  submain<11, 3>();
-		else if (red == 2)  submain<11, 2>();
-		else if (red == 1)  submain<11, 1>();
-	}
-	else if (mag ==  10) {
-		if (red == 4)  submain<10, 4>();
-		else if (red == 3)  submain<10, 3>();
-		else if (red == 2)  submain<10, 2>();
-		else if (red == 1)  submain<10, 1>();
-	}
+int main(int argc, char** argv)
+{
+    if (argc < 3) {
+        cout << "./<prog> <chunk magnitude> <reduction times>" << endl;
+        exit(1);
+    }
+    int mag = atoi(argv[1]);
+    int red = atoi(argv[2]);
+    if (mag == 12) {
+        if (red == 4)
+            submain<12, 4>();
+        else if (red == 3)
+            submain<12, 3>();
+        else if (red == 2)
+            submain<12, 2>();
+        else if (red == 1)
+            submain<12, 1>();
+    }
+    else if (mag == 11) {
+        if (red == 4)
+            submain<11, 4>();
+        else if (red == 3)
+            submain<11, 3>();
+        else if (red == 2)
+            submain<11, 2>();
+        else if (red == 1)
+            submain<11, 1>();
+    }
+    else if (mag == 10) {
+        if (red == 4)
+            submain<10, 4>();
+        else if (red == 3)
+            submain<10, 3>();
+        else if (red == 2)
+            submain<10, 2>();
+        else if (red == 1)
+            submain<10, 1>();
+    }
 
-	return 0;
+    return 0;
 }

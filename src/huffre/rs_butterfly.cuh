@@ -7,6 +7,11 @@
  *
  */
 
+#ifndef RS_BUTTERFLY_CUH
+#define RS_BUTTERFLY_CUH
+
+#include <cuda_runtime.h>
+
 template <int Magnitude>
 __forceinline__ __device__ unsigned int ReverseButterflyIdx(unsigned int idx)
 {
@@ -193,3 +198,5 @@ __global__ void ReduceShuffle_Butterfly(
    if (ti < multiple_of_128B) h[chunksize * bi + ti] = data_src[ti];
    __syncthreads();
 }
+
+#endif
