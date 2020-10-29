@@ -41,14 +41,14 @@ class ArgParser {
 
     void print_err(int i, char** argv, const char* notif_prefix);
 
-    int ap_status;
+    int ap_status = 0;  // TODO check init value
 
     int ndim;
     int d0, d1, d2, d3, len;
     int cb_len;
 
-    int rep_d;  // lossless rep. data
-    int rep_h;  // lossless rep. Huff
+    int dict_byte;  // lossless rep. data
+    int huff_byte;  // lossless rep. Huff
 
     std::string fname;
 
@@ -59,7 +59,7 @@ class ArgParser {
     void trap(int status) { this->ap_status = status; }
 
    public:
-    bool wf_dryrun;
+    bool DO_dryrun;
 
     std::vector<Event*> events;
 

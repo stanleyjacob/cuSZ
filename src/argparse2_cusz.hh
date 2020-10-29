@@ -15,9 +15,10 @@
 #include "argparse2.hh"
 #include "metadata.hh"
 
-class cuszContext : ArgParser {
+class cuszContext : public ArgParser {
    private:
     std::string mode_str;
+    std::string kernel_str;
 
     std::string log_level_str;
     std::string dtype;
@@ -29,14 +30,17 @@ class cuszContext : ArgParser {
     virtual void parse(int argc, char** argv);
 
    public:
-    bool   wf_zip;
-    bool   wf_unzip;
-    bool   skip_huff;
-    bool   skip_writex;
-    bool   verify_huffman;
-    int    rep_q;  // quant. code
-    int    rep_h;  // Huffman
-    int    h_chunksize;
+    bool DO_zip;  // TODO, DO -> conduct, perform??
+    bool DO_unzip;
+    bool do_verify_huffman;
+    bool do_cpu_gzip;  // TODO update this in driver program
+    bool skip_huff;
+    bool skip_writex;
+
+    int quant_byte;  // quant. code
+    int huff_byte;   // Huffman
+    int h_chunksize;
+
     bool   pre_binning;
     double val_rng;
 
@@ -45,10 +49,6 @@ class cuszContext : ArgParser {
 
     cuszContext(int argc, char** argv);
     ~cuszContext(){};
-
-    using ArgParser::get_fname;
-    using ArgParser::get_ndim;
-    using ArgParser::wf_dryrun;
 
     virtual void CheckArgs();
     virtual void PrintShortDoc();

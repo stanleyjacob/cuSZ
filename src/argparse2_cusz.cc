@@ -29,12 +29,16 @@ void cuszContext::parse(int argc, char** argv)
                 case '-':
                     // clang-format off
                     if (s == "--help")      goto HELP;
+                    if (s == "--tutorial" or
+                        s == "--doc")       goto TUTORIAL;
                     if (s == "--mode")      goto MODE;
+                    if (s == "--kernel")    goto KERNEL;
                     if (s == "--input")     goto INPUT_DATUM;
+                    if (s == "--type")      goto TYPE;
                     if (s == "--demo")      goto DEMO;
                     if (s == "--logging")   goto LOGGING;
-                    if (s == "--rep-quant") goto QUANT;
-                    if (s == "--rep-huff")  goto HUFFMAN;
+                    if (s == "--quant")     goto QUANT;
+                    if (s == "--huff")      goto HUFFMAN;
                     if (s == "--huff-chunk")goto HUFF_CHUNK;
                     if (s == "--verify")    goto VERIFY;
                     if (s == "--dict-size") goto DICT;
@@ -49,19 +53,20 @@ void cuszContext::parse(int argc, char** argv)
                     if (s == "--exclude" or //
                         s == "--skip")      goto EXCLUDE;
                     if (s == "--pre")       goto PRE;
+                    if (s == "--cpu")       goto CPU;
                     // clang-format on
                 // work
                 case 'z':
                 WF_Z:
-                    wf_zip = true;
+                    DO_zip = true;
                     break;
                 case 'x':
                 WF_X:
-                    wf_unzip = true;
+                    DO_unzip = true;
                     break;
                 case 'r':
                 WF_DRYRUN:
-                    wf_dryrun = true;
+                    DO_dryrun = true;
                     break;
                 case 'm':  // mode
                 MODE:
@@ -72,6 +77,14 @@ void cuszContext::parse(int argc, char** argv)
                         mode = CompressMode::kABS;
                     else if (mode_str == "pwrel")
                         mode = CompressMode::kPWREL;
+                    break;
+                case 'k':
+                KERNEL:
+                    if (i + 1 <= argc) kernel_str = string(argv[++i]);
+                    if (mode_str == "lorenzo")
+                        cout << "kernel selection not implemented" << endl;
+                    else if (mode_str == "spline")
+                        cout << "kernel selection not implemented" << endl;
                     break;
                 // skip
                 case 'X':
@@ -114,26 +127,40 @@ void cuszContext::parse(int argc, char** argv)
                         len = d0 * d1 * d2 * d3;
                     }
                     break;
-
+                // ************************************************** //
                 // help document
+                // ************************************************** //
                 case 'h':
                 HELP:
                     PrintFullDoc();
                     exit(0);
                     break;
-
-                // TODO version
-                case 'f':
-                    if (string(argv[i]) == "-f32") dtype = "f32";
-                    if (string(argv[i]) == "-f64") dtype = "f64";
-                    break;
-
+                case 'T':
+                TUTORIAL:
+                    // TODO add more entry
+                    if (i + 1 <= argc) {
+                        string tutorial_str(argv[++i]);
+                        if (tutorial_str.find("what") != std::string::npos) {  //
+                            cout << "dim : how data dimension is interpreted.\n";
+                            exit(0);
+                        }
+                        if (tutorial_str.find("dim") != std::string::npos) cout << doc_dim_order << endl;
+                        exit(0);
+                    }
+                // ************************************************** //
                 // input datum file
+                // ************************************************** //
                 case 'i':
                 INPUT_DATUM:
                     if (i + 1 <= argc) fname = string(argv[++i]);
                     break;
-
+                // ************************************************** //
+                // specify data type
+                // ************************************************** //
+                case 't':
+                TYPE:
+                    if (i + 1 <= argc) dtype = string(argv[++i]);
+                    break;
                 // preprocess
                 case 'p':
                 PRE:
@@ -165,11 +192,11 @@ void cuszContext::parse(int argc, char** argv)
                 // internal representation and size
                 case 'Q':
                 QUANT:
-                    if (i + 1 <= argc) rep_q = str2int(argv[++i]);
+                    if (i + 1 <= argc) quant_byte = str2int(argv[++i]);
                     break;
                 case 'H':
                 HUFFMAN:
-                    if (i + 1 <= argc) rep_h = str2int(argv[++i]);
+                    if (i + 1 <= argc) huff_byte = str2int(argv[++i]);
                     break;
                 case 'C':
                 HUFF_CHUNK:
@@ -191,11 +218,18 @@ void cuszContext::parse(int argc, char** argv)
                         }
                     }
                     break;
+                case 'U':
+                CPU:
+                    if (i + 1 <= argc) {
+                        string cpu_do(argv[++i]);
+                        if (cpu_do.find("gzip") != std::string::npos) do_cpu_gzip = true;
+                    }
+                    break;
                 case 'y':
                 VERIFY:  // TODO verify data quanlity
                     if (i + 1 <= argc) {
                         string veri(argv[++i]);
-                        if (veri.find("huffman") != std::string::npos) verify_huffman = true;
+                        if (veri.find("huffman") != std::string::npos) do_verify_huffman = true;
                         // TODO verify data quality
                     }
                     break;
@@ -204,12 +238,18 @@ void cuszContext::parse(int argc, char** argv)
                 DICT:
                     if (i + 1 <= argc) cb_len = str2int(argv[++i]);
                     break;
-                default: const char* notif_prefix = "invalid option at position "; print_err(i, argv, notif_prefix);
+                default:
+                    cout << "aaaaaaaaaaa" << endl;
+                    const char* notif_prefix = "invalid option at position ";  //
+                    print_err(i, argv, notif_prefix);
+                    // break;
             }
         }
         else {
             const char* notif_prefix = "invalid argument at position ";
+            cout << "ddddddddd" << endl;
             print_err(i, argv, notif_prefix);
+            // break;
         }
         i++;
     }
@@ -223,26 +263,26 @@ cuszContext::cuszContext(int argc, char** argv)
     }
     // default values
     cb_len      = 1024;
-    rep_q       = 16;
-    rep_h       = 32;
+    quant_byte  = 2;
+    huff_byte   = 4;
     h_chunksize = 512;
     ndim = -1, d0 = 1, d1 = 1, d2 = 1, d3 = 1;
     mantissa = 1.0, exponent = -4.0;
-    wf_zip    = false;
-    wf_unzip  = false;
-    wf_dryrun = false;
+    DO_zip    = false;
+    DO_unzip  = false;
+    DO_dryrun = false;
 
-    use_demo       = false;
-    verify_huffman = false;
-    skip_huff      = false;
-    skip_writex    = false;
-    pre_binning    = false;
+    use_demo          = false;
+    do_verify_huffman = false;
+    skip_huff         = false;
+    skip_writex       = false;
+    pre_binning       = false;
 
     parse(argc, argv);
 
     // phase 1: check grammar
     if (ap_status != 0) {
-        cout << log_info << "Exiting..." << endl;
+        // cout << log_info << "Exiting..." << endl;
         // after printing ALL argument errors
         exit(-1);
     }
@@ -251,7 +291,11 @@ cuszContext::cuszContext(int argc, char** argv)
     CheckArgs();
 }
 
-void cuszContext::PrintShortDoc() { cout << cusz_short_doc << endl; }
+void cuszContext::PrintShortDoc()
+{
+    cout << "cusz, " << cusz_build_str << endl;
+    cout << cusz_short_doc << endl;
+}
 
 void cuszContext::PrintFullDoc() { cout << format(cusz_full_doc) << endl; }
 
@@ -266,38 +310,40 @@ void cuszContext::CheckArgs()
         cerr << log_err << "Wrong input size(s)!" << endl;
         to_abort = true;
     }
-    if (!wf_zip and !wf_unzip and !wf_dryrun) {
+    if (!DO_zip and !DO_unzip and !DO_dryrun) {
         cerr << log_err << "Select compress (-a), decompress (-x) or dry-run (-r)!" << endl;
         to_abort = true;
     }
-    if (dtype != "f32" and dtype != "f64") {
+    // if (dtype != "f32" and dtype != "f64") {
+    if (not(dtype == "int8" or dtype == "int16" or dtype == "int32" or dtype == "int64"  //
+            or dtype == "fp32" or dtype == "fp64")) {
         cout << dtype << endl;
         cerr << log_err << "Not specifying data type!" << endl;
         to_abort = true;
     }
 
-    if (rep_q == 8) {  // TODO
+    if (quant_byte == 1) {  // TODO
         assert(cb_len <= 256);
     }
-    else if (rep_q == 16) {
+    else if (quant_byte == 2) {
         assert(cb_len <= 65536);
     }
 
-    if (wf_dryrun and wf_zip and wf_unzip) {
+    if (DO_dryrun and DO_zip and DO_unzip) {
         cerr << log_warn << "No need to dry-run, compress and decompress at the same time!" << endl;
         cerr << log_warn << "Will dry run only." << endl << endl;
-        wf_zip   = false;
-        wf_unzip = false;
+        DO_zip   = false;
+        DO_unzip = false;
     }
-    else if (wf_dryrun and wf_zip) {
+    else if (DO_dryrun and DO_zip) {
         cerr << log_warn << "No need to dry-run and compress at the same time!" << endl;
         cerr << log_warn << "Will dry run only." << endl << endl;
-        wf_zip = false;
+        DO_zip = false;
     }
-    else if (wf_dryrun and wf_unzip) {
+    else if (DO_dryrun and DO_unzip) {
         cerr << log_warn << "No need to dry-run and decompress at the same time!" << endl;
         cerr << log_warn << "Will dry run only." << endl << endl;
-        wf_unzip = false;
+        DO_unzip = false;
     }
 
     if (to_abort) {

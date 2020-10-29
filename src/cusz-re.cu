@@ -27,8 +27,11 @@ void main_alt(ctx_t* ctx, unsigned char* archive_bin, unsigned char* metadata_bi
     auto m = new metadata_t;
 
     ctx->Export(m);
-    if (ctx->mode == CompressMode::kR2R) cuszChangeToR2RModeMode(m, GetDatumValueRange<Data>(ctx->get_fname(), m->len));
+    if (ctx->mode == CompressMode::kR2R)  //
+        cuszChangeToR2RModeMode(m, GetDatumValueRange<Data>(ctx->get_fname(), m->len));
 
-    if (ctx->wf_zip or ctx->wf_dryrun) cusz::interface::Compress2<ndim, Data, QuantByte, HuffByte>(ctx, m);
-    if (ctx->wf_unzip) cusz::interface::Decompress2<ndim, Data, QuantByte, HuffByte>(ctx, m);
+    if (ctx->DO_zip or ctx->DO_dryrun)  //
+        cusz::interface::Compress2<ndim, Data, QuantByte, HuffByte>(ctx, m);
+    if (ctx->DO_unzip)  //
+        cusz::interface::Decompress2<ndim, Data, QuantByte, HuffByte>(ctx, m);
 }

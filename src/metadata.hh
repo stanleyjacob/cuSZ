@@ -54,22 +54,22 @@ template <size_t Block>
 void cuszSetDemoDim(struct Metadata<Block>* m, std::string const& datum)
 {
     // {ndim, d0, d1, d2, d3} order
-    size_t const hacc_1GB[]    = {1, 280953867, 1, 1, 1};
-    size_t const hacc_4GB[]    = {1, 1073726487, 1, 1, 1};
-    size_t const cesm[]        = {2, 3600, 1800, 1, 1};
-    size_t const hurricane[]   = {3, 500, 500, 100, 1};
-    size_t const nyx[]         = {3, 512, 512, 512, 1};
-    size_t const qmc[]         = {3, 288, 69, 7935, 1};
-    size_t const qmc_pre[]     = {3, 69, 69, 33120, 1};
-    size_t const exafel_demo[] = {2, 388, 59200, 1, 1};
-    size_t const aramco[]      = {3, 235, 849, 849, 1};
+    size_t const hacc_1GB[]  = {1, 280953867, 1, 1, 1};
+    size_t const hacc_4GB[]  = {1, 1073726487, 1, 1, 1};
+    size_t const cesm[]      = {2, 3600, 1800, 1, 1};
+    size_t const hurricane[] = {3, 500, 500, 100, 1};
+    size_t const nyx[]       = {3, 512, 512, 512, 1};
+    size_t const qmc[]       = {3, 288, 69, 7935, 1};
+    size_t const qmc_pre[]   = {3, 69, 69, 33120, 1};
+    size_t const exafel[]    = {2, 388, 59200, 1, 1};
+    size_t const aramco[]    = {3, 235, 849, 849, 1};
+    size_t const parihaka[]  = {3, 1168, 1126, 922, 1};
 
     std::unordered_map<std::string, size_t const*> entries = {
-        {std::string("hacc1g"), hacc_1GB}, {std::string("hacc4g"), hacc_4GB},
-        {std::string("cesm"), cesm},       {std::string("hurricane"), hurricane},
-        {std::string("nyx"), nyx},         {std::string("qmc"), qmc},
-        {std::string("qmcpre"), qmc_pre},  {std::string("exafeldemo"), exafel_demo},
-        {std::string("aramco"), aramco}};
+        {std::string("hacc1g"), hacc_1GB},     {std::string("hacc4g"), hacc_4GB}, {std::string("cesm"), cesm},
+        {std::string("hurricane"), hurricane}, {std::string("nyx"), nyx},         {std::string("qmc"), qmc},
+        {std::string("qmcpre"), qmc_pre},      {std::string("exafel"), exafel},   {std::string("aramco"), aramco},
+        {std::string("parihaka"), parihaka}};
     auto e = entries.at(datum);
     cuszSetDim(m, e[0], e[1], e[2], e[3], e[4]);
 }

@@ -56,7 +56,7 @@ void cusz::interface::Compress2(ctx_t* ctx, typename MetadataTrait<ndim>::metada
     cudaMalloc((void**)&d_m, sizeof(metadata_t));
     cudaMemcpy(d_m, m, sizeof(metadata_t), cudaMemcpyHostToDevice);
 
-    if (ctx->wf_dryrun) {
+    if (ctx->DO_dryrun) {
         void* args[] = {&d_m, &d_data};
         dim3  grid_dim(m->nb0, m->nb1, m->nb2), block_dim(m->b, m->b, m->b);
 #if __cplusplus >= 201703L
@@ -74,7 +74,7 @@ void cusz::interface::Compress2(ctx_t* ctx, typename MetadataTrait<ndim>::metada
         goto COMPRESS_END;
     }
 
-    if (ctx->wf_zip) {
+    if (ctx->DO_zip) {
         auto d_q = mem::CreateCUDASpace<Quant>(m->len);
 
         {  // Lorenzo
@@ -148,7 +148,7 @@ void cusz::interface::Decompress2(ctx_t* ctx, typename MetadataTrait<ndim>::meta
     else {
         xq = ::lossless::interface::HuffmanDecode<Quant, Huff>(
             fi_qbase, m->len, ctx->h_chunksize, m->total_uint, m->cap);
-        if (ctx->verify_huffman) cusz::impl::VerifyHuffman<ndim, Data, QuantByte>(ctx, m, xq);
+        if (ctx->do_verify_huffman) cusz::impl::VerifyHuffman<ndim, Data, QuantByte>(ctx, m, xq);
     }
     auto d_xq      = mem::CreateDeviceSpaceAndMemcpyFromHost(xq, m->len);
     auto d_outlier = mem::CreateCUDASpace<Data>(MxM);
