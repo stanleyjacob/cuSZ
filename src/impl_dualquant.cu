@@ -1,94 +1,41 @@
 #include "cusz_dualquant.cu"
 #include "type_trait.hh"
 
-// compression
-// prototype 1D
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_1d1l<fp32, uint8__t, 32>(fp32*, uint8__t*, size_t const*, fp64 const*);
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_1d1l<fp32, uint16_t, 32>(fp32*, uint16_t*, size_t const*, fp64 const*);
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_1d1l<fp32, uint32_t, 32>(fp32*, uint32_t*, size_t const*, fp64 const*);
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_1d1l<fp32, uint8__t, 64>(fp32*, uint8__t*, size_t const*, fp64 const*);
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_1d1l<fp32, uint16_t, 64>(fp32*, uint16_t*, size_t const*, fp64 const*);
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_1d1l<fp32, uint32_t, 64>(fp32*, uint32_t*, size_t const*, fp64 const*);
-// prototype 2D
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_2d1l<fp32, uint8__t, 16>(fp32*, uint8__t*, size_t const*, fp64 const*);
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_2d1l<fp32, uint16_t, 16>(fp32*, uint16_t*, size_t const*, fp64 const*);
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_2d1l<fp32, uint32_t, 16>(fp32*, uint32_t*, size_t const*, fp64 const*);
-// prototype 3D
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_3d1l<fp32, uint8__t, 8>(fp32*, uint8__t*, size_t const*, fp64 const*);
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_3d1l<fp32, uint16_t, 8>(fp32*, uint16_t*, size_t const*, fp64 const*);
-template __global__ void
-cusz::predictor_quantizer::c_lorenzo_3d1l<fp32, uint32_t, 8>(fp32*, uint32_t*, size_t const*, fp64 const*);
+// clang-format off
+// compression prototypes
+template __global__ void cusz::predictor_quantizer::c_lorenzo_1d1l<F4, UI1, MetadataTrait<1>::Block>(F4*, UI1*, size_t const*, double const*);
+template __global__ void cusz::predictor_quantizer::c_lorenzo_1d1l<F4, UI2, MetadataTrait<1>::Block>(F4*, UI2*, size_t const*, double const*);
+template __global__ void cusz::predictor_quantizer::c_lorenzo_1d1l<F4, UI4, MetadataTrait<1>::Block>(F4*, UI4*, size_t const*, double const*);
+template __global__ void cusz::predictor_quantizer::c_lorenzo_2d1l<F4, UI1, MetadataTrait<2>::Block>(F4*, UI1*, size_t const*, double const*);
+template __global__ void cusz::predictor_quantizer::c_lorenzo_2d1l<F4, UI2, MetadataTrait<2>::Block>(F4*, UI2*, size_t const*, double const*);
+template __global__ void cusz::predictor_quantizer::c_lorenzo_2d1l<F4, UI4, MetadataTrait<2>::Block>(F4*, UI4*, size_t const*, double const*);
+template __global__ void cusz::predictor_quantizer::c_lorenzo_3d1l<F4, UI1, MetadataTrait<3>::Block>(F4*, UI1*, size_t const*, double const*);
+template __global__ void cusz::predictor_quantizer::c_lorenzo_3d1l<F4, UI2, MetadataTrait<3>::Block>(F4*, UI2*, size_t const*, double const*);
+template __global__ void cusz::predictor_quantizer::c_lorenzo_3d1l<F4, UI4, MetadataTrait<3>::Block>(F4*, UI4*, size_t const*, double const*);
+// decompression prototypes
+template __global__ void cusz::predictor_quantizer::x_lorenzo_1d1l<F4, UI1, MetadataTrait<1>::Block>(F4*, F4*, UI1*, size_t const*, double);
+template __global__ void cusz::predictor_quantizer::x_lorenzo_1d1l<F4, UI2, MetadataTrait<1>::Block>(F4*, F4*, UI2*, size_t const*, double);
+template __global__ void cusz::predictor_quantizer::x_lorenzo_1d1l<F4, UI4, MetadataTrait<1>::Block>(F4*, F4*, UI4*, size_t const*, double);
+template __global__ void cusz::predictor_quantizer::x_lorenzo_2d1l<F4, UI1, MetadataTrait<2>::Block>(F4*, F4*, UI1*, size_t const*, double);
+template __global__ void cusz::predictor_quantizer::x_lorenzo_2d1l<F4, UI2, MetadataTrait<2>::Block>(F4*, F4*, UI2*, size_t const*, double);
+template __global__ void cusz::predictor_quantizer::x_lorenzo_2d1l<F4, UI4, MetadataTrait<2>::Block>(F4*, F4*, UI4*, size_t const*, double);
+template __global__ void cusz::predictor_quantizer::x_lorenzo_3d1l<F4, UI1, MetadataTrait<3>::Block>(F4*, F4*, UI1*, size_t const*, double);
+template __global__ void cusz::predictor_quantizer::x_lorenzo_3d1l<F4, UI2, MetadataTrait<3>::Block>(F4*, F4*, UI2*, size_t const*, double);
+template __global__ void cusz::predictor_quantizer::x_lorenzo_3d1l<F4, UI4, MetadataTrait<3>::Block>(F4*, F4*, UI4*, size_t const*, double);
 
 // using virtual padding
 // prototype 2D
-template __global__ void cusz::predictor_quantizer::c_lorenzo_2d1l_virtual_padding<fp32, uint8__t, 16>(
-    fp32*,
-    uint8__t*,
-    size_t const*,
-    fp64 const*);
-template __global__ void cusz::predictor_quantizer::c_lorenzo_2d1l_virtual_padding<fp32, uint16_t, 16>(
-    fp32*,
-    uint16_t*,
-    size_t const*,
-    fp64 const*);
-template __global__ void cusz::predictor_quantizer::c_lorenzo_2d1l_virtual_padding<fp32, uint32_t, 16>(
-    fp32*,
-    uint32_t*,
-    size_t const*,
-    fp64 const*);
-// prototype 3D
-template __global__ void cusz::predictor_quantizer::c_lorenzo_3d1l_virtual_padding<fp32, uint8__t, 8>(
-    fp32*,
-    uint8__t*,
-    size_t const*,
-    fp64 const*);
-template __global__ void cusz::predictor_quantizer::c_lorenzo_3d1l_virtual_padding<fp32, uint16_t, 8>(
-    fp32*,
-    uint16_t*,
-    size_t const*,
-    fp64 const*);
-template __global__ void cusz::predictor_quantizer::c_lorenzo_3d1l_virtual_padding<fp32, uint32_t, 8>(
-    fp32*,
-    uint32_t*,
-    size_t const*,
-    fp64 const*);
-
-// decompression
-// prototype 1D
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_1d1l<fp32, uint8__t, 32>(fp32*, fp32*, uint8__t*, size_t const*, fp64);
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_1d1l<fp32, uint16_t, 32>(fp32*, fp32*, uint16_t*, size_t const*, fp64);
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_1d1l<fp32, uint32_t, 32>(fp32*, fp32*, uint32_t*, size_t const*, fp64);
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_1d1l<fp32, uint8__t, 64>(fp32*, fp32*, uint8__t*, size_t const*, fp64);
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_1d1l<fp32, uint16_t, 64>(fp32*, fp32*, uint16_t*, size_t const*, fp64);
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_1d1l<fp32, uint32_t, 64>(fp32*, fp32*, uint32_t*, size_t const*, fp64);
-// prototype 2D
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_2d1l<fp32, uint8__t, 16>(fp32*, fp32*, uint8__t*, size_t const*, fp64);
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_2d1l<fp32, uint16_t, 16>(fp32*, fp32*, uint16_t*, size_t const*, fp64);
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_2d1l<fp32, uint32_t, 16>(fp32*, fp32*, uint32_t*, size_t const*, fp64);
-// prototype 3D
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_3d1l<fp32, uint8__t, 8>(fp32*, fp32*, uint8__t*, size_t const*, fp64);
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_3d1l<fp32, uint16_t, 8>(fp32*, fp32*, uint16_t*, size_t const*, fp64);
-template __global__ void
-cusz::predictor_quantizer::x_lorenzo_3d1l<fp32, uint32_t, 8>(fp32*, fp32*, uint32_t*, size_t const*, fp64);
+// deprecated
+// template __global__ void
+// cusz::predictor_quantizer::c_lorenzo_2d1l_virtual_padding<F4, UI1, 16>(F4*, UI1*, size_t const*, double const**);
+// template __global__ void
+// cusz::predictor_quantizer::c_lorenzo_2d1l_virtual_padding<F4, UI2, 16>(F4*, UI2*, size_t const*, double const**);
+// template __global__ void
+// cusz::predictor_quantizer::c_lorenzo_2d1l_virtual_padding<F4, UI4, 16>(F4*, UI4*, size_t const*, double const**);
+// // prototype 3D
+// template __global__ void
+// cusz::predictor_quantizer::c_lorenzo_3d1l_virtual_padding<F4, UI1, 8>(F4*, UI1*, size_t const*, double const**);
+// template __global__ void
+// cusz::predictor_quantizer::c_lorenzo_3d1l_virtual_padding<F4, UI2, 8>(F4*, UI2*, size_t const*, double const**);
+// template __global__ void
+// cusz::predictor_quantizer::c_lorenzo_3d1l_virtual_padding<F4, UI4, 8>(F4*, UI4*, size_t const*, double const**);
