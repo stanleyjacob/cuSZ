@@ -14,15 +14,18 @@
 #include "lorenzo_trait.cuh"
 
 #if __cplusplus >= 201703L
+#else
+#define constexpr
+#endif
 
 template <int ndim>
 struct zip::Lorenzo_nd1l {
     template <int Block, typename Data, typename Quant>
     static void Call(struct Metadata<Block>* m, Data* d, Quant* q)
     {
-        constexpr if (n == 1) cusz::predictor_quantizer::c_lorenzo_1d1l<Block, Data, Quant>(m, d, q);
-        constexpr if (n == 2) cusz::predictor_quantizer::c_lorenzo_2d1l<Block, Data, Quant>(m, d, q);
-        constexpr if (n == 3) cusz::predictor_quantizer::c_lorenzo_3d1l<Block, Data, Quant>(m, d, q);
+        constexpr if (ndim == 1) cusz::predictor_quantizer::c_lorenzo_1d1l<Block, Data, Quant>(m, d, q);
+        constexpr if (ndim == 2) cusz::predictor_quantizer::c_lorenzo_2d1l<Block, Data, Quant>(m, d, q);
+        constexpr if (ndim == 3) cusz::predictor_quantizer::c_lorenzo_3d1l<Block, Data, Quant>(m, d, q);
     }
 };
 
@@ -31,9 +34,9 @@ struct unzip::Lorenzo_nd1l {
     template <int Block, typename Data, typename Quant>
     static void Call(struct Metadata<Block>* m, Data* xd, Data* outlier, Quant* q)
     {
-        constexpr if (n == 1) cusz::predictor_quantizer::x_lorenzo_1d1l<Block, Data, Quant>(m, xd, outlier, q);
-        constexpr if (n == 2) cusz::predictor_quantizer::x_lorenzo_2d1l<Block, Data, Quant>(m, xd, outlier, q);
-        constexpr if (n == 3) cusz::predictor_quantizer::x_lorenzo_3d1l<Block, Data, Quant>(m, xd, outlier, q);
+        constexpr if (ndim == 1) cusz::predictor_quantizer::x_lorenzo_1d1l<Block, Data, Quant>(m, xd, outlier, q);
+        constexpr if (ndim == 2) cusz::predictor_quantizer::x_lorenzo_2d1l<Block, Data, Quant>(m, xd, outlier, q);
+        constexpr if (ndim == 3) cusz::predictor_quantizer::x_lorenzo_3d1l<Block, Data, Quant>(m, xd, outlier, q);
     }
 };
 
@@ -42,10 +45,10 @@ struct dryrun::Lorenzo_nd1l {
     template <int Block, typename Data>
     static void Call(struct Metadata<Block>* m, Data* d)
     {
-        constexpr if (n == 1) cusz::dryrun::lorenzo_1d1l(m, d);
-        constexpr if (n == 2) cusz::dryrun::lorenzo_2d1l(m, d);
-        constexpr if (n == 3) cusz::dryrun::lorenzo_3d1l(m, d);
+        constexpr if (ndim == 1) cusz::dryrun::lorenzo_1d1l(m, d);
+        constexpr if (ndim == 2) cusz::dryrun::lorenzo_2d1l(m, d);
+        constexpr if (ndim == 3) cusz::dryrun::lorenzo_3d1l(m, d);
     }
 };
 
-#endif
+// #endif
