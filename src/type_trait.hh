@@ -54,6 +54,7 @@ template <> struct CodebookTrait<8> {typedef unsigned long long Huff;};
 template <int HuffByte> struct HuffTrait;
 template <> struct HuffTrait<4> {typedef unsigned long Huff;};
 template <> struct HuffTrait<8> {typedef unsigned long long Huff;};
+// clang-format on
 
 typedef MetadataTrait<1>::metadata_t m1_t;
 typedef MetadataTrait<2>::metadata_t m2_t;
@@ -62,10 +63,23 @@ typedef MetadataTrait<3>::metadata_t m3_t;
 typedef QuantTrait<1>::Quant q1_t;
 typedef QuantTrait<2>::Quant q2_t;
 
-typedef float  fp32;
-typedef double fp64;
-
+// alias style 1
 typedef int8_t  int8__t;
 typedef uint8_t uint8__t;
+typedef float   fp32;
+typedef double  fp64;
+// alias style 2
+typedef int8_t             I1;
+typedef int16_t            I2;
+typedef int32_t            I4;
+typedef long long          I8;
+typedef int64_t            I8_2;
+typedef uint8_t            UI1;
+typedef uint16_t           UI2;
+typedef uint32_t           UI4;
+typedef unsigned long long UI8;
+typedef uint64_t           UI8_2;
+typedef float              F4;
+typedef double             F8;
 
 #endif
