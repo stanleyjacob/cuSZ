@@ -799,7 +799,14 @@ __device__ void ShuffleMerge_v1(
  * @param dbg_bi
  * @return __global__
  */
-template <typename Input, typename Dict, typename Huff, int Magnitude, int ReductionFactor, int ShuffleFactor>
+template <
+    typename Input,
+    typename Dict,
+    typename Huff,
+    typename Bitwidth,  // int32 or int16
+    int Magnitude,
+    int RedFactor,
+    int ShflFactor>
 __global__ void ReduceShuffle(
     Input*    in,
     size_t    len,
@@ -810,27 +817,25 @@ __global__ void ReduceShuffle(
     char*     rich_dbg = nullptr,
     uint32_t  dbg_bi   = 3)
 {
-    static_assert(Magnitude == ReductionFactor + ShuffleFactor, "magnitude != (shuffle + reduction) factor");
-    static_assert(ReductionFactor >= 1, "RF must be >= 1, otherwise, you lose the point of compression.");
-    static_assert((2 << Magnitude) < 98304, "Shared memory used too much.");
+    static_assert(Magnitude == RedFactor + ShflFactor, "magnitude != (shuffle + reduction) factor");
+    static_assert(RedFactor >= 1, "RF must be >= 1, otherwise, you lose the point of compression.");
+    static_assert((2 << Magnitude) < 98304, "Shared memory used too much.");  // TODO
 
     extern __shared__ char __buff[];
 
-    constexpr unsigned int chunksize = 1 << Magnitude;
+    constexpr unsigned int chunk = 1 << Magnitude;
 
-    auto __data = reinterpret_cast<Huff*>(__buff);
-    auto __bw = reinterpret_cast<int*>(__buff + (chunksize / 2 + chunksize / 4) * sizeof(Huff));  // todo int->template
-    auto data_src  = __data;                                                     // 1st data zone of (chunksize/2)
-    auto data_dst  = __data + chunksize / 2;                                     // 2nd data zone of (chunksize/4)
-    auto data_exc  = data_src;                                                   // swap zone
-    auto bw_src    = __bw;                                                       // 1st bw zone of (chunksize/2)
-    auto bw_dst    = __bw + chunksize / 2;                                       // 2nd bw zone of (chunksize/4)
-    auto bw_exc    = bw_src;                                                     // swap zone
-    auto violating = __buff + chunksize * 3 / 4 * (sizeof(Huff) + sizeof(int));  // zone of 1<< (Magnitude - RF)
+    auto __data    = reinterpret_cast<Huff*>(__buff);
+    auto __bw      = reinterpret_cast<Bitwidth*>(__buff + chunk * 3 / 4 * sizeof(Huff));
+    auto violating = __buff + chunk * 3 / 4 * (sizeof(Huff) + sizeof(Bitwidth));  // zone of 1<< (Mag - RF)
+    auto data_src  = __data;                                                      // 1st data zone of (chunk/2)
+    auto data_dst  = __data + chunk / 2;                                          // 2nd data zone of (chunk/4)
+    auto bw_src    = __bw;                                                        // 1st bw zone of (chunk/2)
+    auto bw_dst    = __bw + chunk / 2;                                            // 2nd bw zone of (chunk/4)
 
     // Reduction I: detach metadata and code; merge as much as possible
-    LoadFromGlobalMemoryAndMergeOnce_v1                       //
-        <Input, Dict, Huff, int, Magnitude, ReductionFactor>  //
+    LoadFromGlobalMemoryAndMergeOnce_v1                      //
+        <Input, Dict, Huff, Bitwidth, Magnitude, RedFactor>  //
         (in, len, cb, data_src, bw_src);
 
 #ifdef REDUCE1TIME
@@ -839,34 +844,28 @@ __global__ void ReduceShuffle(
 
     // Reduction II: merge as much as possible
     // 32-bit only allows at max RF=4
-    if (ReductionFactor - 2 >= 0) {
-        ReduceMerge_v1<Huff, int, ReductionFactor - 2>(&data_src, &data_dst, &bw_src, &bw_dst);
-    }
-    if (ReductionFactor - 3 >= 0) {
-        ReduceMerge_v1<Huff, int, ReductionFactor - 3>(&data_src, &data_dst, &bw_src, &bw_dst);
-    }
-    if (ReductionFactor - 4 >= 0) {
-        ReduceMerge_v1<Huff, int, ReductionFactor - 4>(&data_src, &data_dst, &bw_src, &bw_dst);
-    }
+    if (RedFactor - 2 >= 0) ReduceMerge_v1<Huff, Bitwidth, RedFactor - 2>(&data_src, &data_dst, &bw_src, &bw_dst);
+    if (RedFactor - 3 >= 0) ReduceMerge_v1<Huff, Bitwidth, RedFactor - 3>(&data_src, &data_dst, &bw_src, &bw_dst);
+    if (RedFactor - 4 >= 0) ReduceMerge_v1<Huff, Bitwidth, RedFactor - 4>(&data_src, &data_dst, &bw_src, &bw_dst);
 
 #ifdef REDUCE12TIME
     return;
 #endif
 
-    // Shuffle, from now on, 1 thread on 1 point; TODO stride <-> ShuffleFactor
-    if (ShuffleFactor - 13 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 13>(data_src, bw_src);
-    if (ShuffleFactor - 12 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 12>(data_src, bw_src);
-    if (ShuffleFactor - 11 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 11>(data_src, bw_src);
-    if (ShuffleFactor - 10 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 10>(data_src, bw_src);
-    if (ShuffleFactor - 9 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 9>(data_src, bw_src);
-    if (ShuffleFactor - 8 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 8>(data_src, bw_src);
-    if (ShuffleFactor - 7 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 7>(data_src, bw_src);
-    if (ShuffleFactor - 6 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 6>(data_src, bw_src);
-    if (ShuffleFactor - 5 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 5>(data_src, bw_src);
-    if (ShuffleFactor - 4 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 4>(data_src, bw_src);
-    if (ShuffleFactor - 3 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 3>(data_src, bw_src);
-    if (ShuffleFactor - 2 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 2>(data_src, bw_src);
-    if (ShuffleFactor - 1 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 1>(data_src, bw_src);
+    // Shuffle, from now on, 1 thread on 1 point; TODO stride <-> ShflFactor
+    if (ShflFactor - 13 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 13>(data_src, bw_src);
+    if (ShflFactor - 12 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 12>(data_src, bw_src);
+    if (ShflFactor - 11 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 11>(data_src, bw_src);
+    if (ShflFactor - 10 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 10>(data_src, bw_src);
+    if (ShflFactor - 9 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 9>(data_src, bw_src);
+    if (ShflFactor - 8 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 8>(data_src, bw_src);
+    if (ShflFactor - 7 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 7>(data_src, bw_src);
+    if (ShflFactor - 6 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 6>(data_src, bw_src);
+    if (ShflFactor - 5 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 5>(data_src, bw_src);
+    if (ShflFactor - 4 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 4>(data_src, bw_src);
+    if (ShflFactor - 3 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 3>(data_src, bw_src);
+    if (ShflFactor - 2 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 2>(data_src, bw_src);
+    if (ShflFactor - 1 >= 0) ShuffleMerge_v1<Huff, Bitwidth, ShflFactor, 1>(data_src, bw_src);
 
     // end of reduce-shuffle
     auto final_bw = bw_src[0];  // create private var
