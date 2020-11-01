@@ -650,6 +650,96 @@ __device__ void LoadFromGlobalMemoryAndMergeOnce_v1(
     }
 }
 
+template <typename Huff, typename Int, int ReductionIter>
+__device__ void ReduceMerge_v1(
+    // size_t        len,  // TODO handle later
+    volatile Huff** data_src,
+    volatile Huff** data_dst,
+    volatile Int**  bw_src,
+    volatile Int**  bw_dst)
+{  // TODO another version, n threads to fill cacheline
+
+    if (ReductionIter == 2) {
+        auto lidx = 2 * tix * 4 /*repeat 4 times of merging 2 syms*/;
+
+        Huff lsym0 = *data_src[lidx + 0x0], rsym0 = *data_src[lidx + 0x1];
+        Huff lsym1 = *data_src[lidx + 0x2], rsym1 = *data_src[lidx + 0x3];
+        Huff lsym2 = *data_src[lidx + 0x4], rsym2 = *data_src[lidx + 0x5];
+        Huff lsym3 = *data_src[lidx + 0x6], rsym3 = *data_src[lidx + 0x7];
+
+        Int lbw0 = *bw_src[lidx + 0x0], rbw0 = *bw_src[lidx + 0x1];
+        Int lbw1 = *bw_src[lidx + 0x2], rbw1 = *bw_src[lidx + 0x3];
+        Int lbw2 = *bw_src[lidx + 0x4], rbw2 = *bw_src[lidx + 0x5];
+        Int lbw3 = *bw_src[lidx + 0x6], rbw3 = *bw_src[lidx + 0x7];
+
+        *data_dst[(lidx + 0 * 2) >> 1] = lsym0 | (rsym0 >> lbw0);
+        *data_dst[(lidx + 1 * 2) >> 1] = lsym1 | (rsym1 >> lbw1);
+        *data_dst[(lidx + 2 * 2) >> 1] = lsym2 | (rsym2 >> lbw2);
+        *data_dst[(lidx + 3 * 2) >> 1] = lsym3 | (rsym3 >> lbw3);
+
+        *bw_dst[(lidx + 0 * 2) >> 1] = lbw0 + rbw0;
+        *bw_dst[(lidx + 1 * 2) >> 1] = lbw1 + rbw1;
+        *bw_dst[(lidx + 2 * 2) >> 1] = lbw2 + rbw2;
+        *bw_dst[(lidx + 3 * 2) >> 1] = lbw3 + rbw3;
+
+        __syncthreads();
+
+        auto data_exc = *data_src;
+        *data_src     = *data_dst;
+        *data_dst     = data_exc;
+
+        auto bw_exc = *bw_src;
+        *bw_src     = *bw_dst;
+        *bw_dst     = bw_exc;
+        __syncthreads();
+    }
+    if (ReductionIter == 1) {
+        auto lidx = 2 * tix * 2 /*repeat 2 times of merging 2 syms*/;
+
+        Huff lsym0 = *data_src[lidx + 0x0], rsym0 = *data_src[lidx + 0x1];
+        Huff lsym1 = *data_src[lidx + 0x2], rsym1 = *data_src[lidx + 0x3];
+
+        Int lbw0 = *bw_src[lidx + 0x0], rbw0 = *bw_src[lidx + 0x1];
+        Int lbw1 = *bw_src[lidx + 0x2], rbw1 = *bw_src[lidx + 0x3];
+
+        *data_dst[(lidx + 0 * 2) >> 1] = lsym0 | (rsym0 >> lbw0);
+        *data_dst[(lidx + 1 * 2) >> 1] = lsym1 | (rsym1 >> lbw1);
+
+        *bw_dst[(lidx + 0 * 2) >> 1] = lbw0 + rbw0;
+        *bw_dst[(lidx + 1 * 2) >> 1] = lbw1 + rbw1;
+
+        __syncthreads();
+
+        auto data_exc = *data_src;
+        *data_src     = *data_dst;
+        *data_dst     = data_exc;
+
+        auto bw_exc = *bw_src;
+        *bw_src     = *bw_dst;
+        *bw_dst     = bw_exc;
+        __syncthreads();
+    }
+    if (ReductionIter == 0) {
+        auto lidx = 2 * tix * 1 /*repeat 1 times of merging 2 syms*/;
+
+        Huff lsym0 = *data_src[lidx + 0x0], rsym0 = *data_src[lidx + 0x1];
+
+        Int lbw0 = *bw_src[lidx + 0x0], rbw0 = *bw_src[lidx + 0x1];
+
+        *data_dst[(lidx + 0 * 2) >> 1] = lsym0 | (rsym0 >> lbw0);
+
+        *bw_dst[(lidx + 0 * 2) >> 1] = lbw0 + rbw0;
+
+        __syncthreads();
+
+        auto data_exc = *data_src;
+        *data_src     = *data_dst;
+        *data_dst     = data_exc;
+
+        auto bw_exc = *bw_src;
+        *bw_src     = *bw_dst;
+        *bw_dst     = bw_exc;
+        __syncthreads();
     }
 }
 
@@ -711,26 +801,16 @@ __global__ void ReduceShuffle(
 #endif
 
     // Reduction II: merge as much as possible
-    for (auto rf = ReductionFactor - 2; rf >= 0; rf--) {  // ReductionFactor - 2 = 1, 4 -> 2 -> 1 (2 times)
-        auto repeat = 1 << rf;
-        for (auto r = 0; r < repeat; r++) {
-            auto lidx = 2 * (tix + n_worker * r);
-            auto lsym = data_src[lidx];
-            auto rsym = data_src[lidx + 1];
-            auto lbw  = bw_src[lidx];
-            auto rbw  = bw_src[lidx + 1];
-
-            data_dst[lidx >> 1] = lsym | (rsym >> lbw);
-            bw_dst[lidx >> 1]   = lbw + rbw;  // sum bitwidths
-            __syncthreads();
-        }
-        __syncthreads();
-        data_exc = data_src, bw_exc = bw_src;
-        data_src = data_dst, bw_src = bw_dst;
-        data_dst = data_exc, bw_dst = bw_exc;
-        __syncthreads();
+    // 32-bit only allows at max RF=4
+    if (ReductionFactor - 2 >= 0) {
+        ReduceMerge_v1<Huff, int, ReductionFactor - 2>(&data_src, &data_dst, &bw_src, &bw_dst);
     }
-    __syncthreads();
+    if (ReductionFactor - 3 >= 0) {
+        ReduceMerge_v1<Huff, int, ReductionFactor - 3>(&data_src, &data_dst, &bw_src, &bw_dst);
+    }
+    if (ReductionFactor - 4 >= 0) {
+        ReduceMerge_v1<Huff, int, ReductionFactor - 4>(&data_src, &data_dst, &bw_src, &bw_dst);
+    }
 
 #ifdef REDUCE12TIME
     return;
