@@ -743,6 +743,43 @@ __device__ void ReduceMerge_v1(
     }
 }
 
+template <typename Huff, typename Int, int ShuffleFactor, int ShuffleIter>
+__device__ void ShuffleMerge_v1(
+    // size_t        len,  // TODO handle later
+    volatile Huff* data_buff,
+    volatile Int*  bw_buff)
+{  // TODO another version, n threads to fill cacheline
+    constexpr int stride = 1 << (ShuffleFactor - ShuffleIter);
+
+    auto         l           = tix / (stride << 1) * (stride << 1);
+    auto         r           = l + stride;
+    auto         l_bw        = bw_buff[l];
+    unsigned int dtype_ofst  = l_bw / (sizeof(Huff) * 8);
+    unsigned int used_bits   = l_bw % (sizeof(Huff) * 8);
+    unsigned int unused_bits = sizeof(Huff) * 8 - used_bits;
+    auto         l_end       = data_buff + l + dtype_ofst;
+
+    auto this_point = data_buff[tix];
+    auto _1st       = this_point >> used_bits;
+    auto _2nd       = this_point << unused_bits;
+
+    // tix in [r, r+stride) or ((r ..< r+stride )), whole right subgroup
+    // &data_buff[ ((r ..< r+stride)) ] have conflicts with (l_end+ ((0 ..< stride)) + 0/1)
+    // because the whole shuffle subprocedure compresses at a factor of < 2
+    if (tix >= r and tix < r + stride) {
+        atomicAnd(data_buff + tix, 0x0);  // meaning: data_buff[tix] = 0;
+    }
+    /* experimental */ __syncthreads();
+    if (tix >= r and tix < r + stride) {        // whole right subgroup
+        atomicOr(l_end + (tix - r) + 0, _1st);  // meaning: *(l_end + (tix -r) + 0) = _1st;
+        atomicOr(l_end + (tix - r) + 1, _2nd);  // meaning: *(l_end + (tix -r) + 0) = _1st;
+    }
+    /* optional */ __syncthreads();
+
+    if (tix == l) bw_buff[l] += bw_buff[l + stride];  // very imbalanced
+    /* necessary */ __syncthreads();
+}
+
 /**
  * @brief Reduction for ReductionFactor times, and shuffle-merge for ShuffleFactor times
       input
@@ -816,42 +853,22 @@ __global__ void ReduceShuffle(
     return;
 #endif
 
-    //// Shuffle, from now on, 1 thread on 1 point; TODO stride <-> ShuffleFactor
-    ////////////////////////////////////////////////////////////////////////////////
-    auto stride = 1;
-    for (auto sf = ShuffleFactor; sf > 0; sf--, stride *= 2) {
-        auto         l           = tix / (stride << 1) * (stride << 1);
-        auto         r           = l + stride;
-        auto         l_bw        = bw_src[l];
-        unsigned int dtype_ofst  = l_bw / (sizeof(Huff) * 8);
-        unsigned int used_bits   = l_bw % (sizeof(Huff) * 8);
-        unsigned int unused_bits = sizeof(Huff) * 8 - used_bits;
-        auto         l_end       = data_src + l + dtype_ofst;
+    // Shuffle, from now on, 1 thread on 1 point; TODO stride <-> ShuffleFactor
+    if (ShuffleFactor - 13 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 13>(data_src, bw_src);
+    if (ShuffleFactor - 12 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 12>(data_src, bw_src);
+    if (ShuffleFactor - 11 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 11>(data_src, bw_src);
+    if (ShuffleFactor - 10 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 10>(data_src, bw_src);
+    if (ShuffleFactor - 9 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 9>(data_src, bw_src);
+    if (ShuffleFactor - 8 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 8>(data_src, bw_src);
+    if (ShuffleFactor - 7 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 7>(data_src, bw_src);
+    if (ShuffleFactor - 6 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 6>(data_src, bw_src);
+    if (ShuffleFactor - 5 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 5>(data_src, bw_src);
+    if (ShuffleFactor - 4 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 4>(data_src, bw_src);
+    if (ShuffleFactor - 3 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 3>(data_src, bw_src);
+    if (ShuffleFactor - 2 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 2>(data_src, bw_src);
+    if (ShuffleFactor - 1 >= 0) ShuffleMerge_v1<Huff, int, ShuffleFactor, 1>(data_src, bw_src);
 
-        auto this_point = data_src[tix];
-        auto _1st       = this_point >> used_bits;
-        auto _2nd       = this_point << unused_bits;
-
-        // tix in [r, r+stride) or ((r ..< r+stride )), whole right subgroup
-        // &data_src[ ((r ..< r+stride)) ] have conflicts with (l_end+ ((0 ..< stride)) + 0/1)
-        // because the whole shuffle subprocedure compresses at a factor of < 2
-        if (tix >= r and tix < r + stride) {
-            atomicAnd(data_src + tix, 0x0);  // meaning: data_src[tix] = 0;
-        }
-        /* experimental */ __syncthreads();
-        if (tix >= r and tix < r + stride) {        // whole right subgroup
-            atomicOr(l_end + (tix - r) + 0, _1st);  // meaning: *(l_end + (tix -r) + 0) = _1st;
-            atomicOr(l_end + (tix - r) + 1, _2nd);  // meaning: *(l_end + (tix -r) + 0) = _1st;
-        }
-        ///* optional */ __syncthreads();
-
-        if (tix == l) bw_src[l] += bw_src[l + stride];  // very imbalanced
-        /* necessary */ __syncthreads();
-    }
-    /* necessary */ __syncthreads();
-
-    //// end of reduce-shuffle
-    ////////////////////////////////////////////////////////////////////////////////
+    // end of reduce-shuffle
     auto final_bw = bw_src[0];  // create private var
     if (tix == 0) hmeta[bix] = final_bw;
     __syncthreads();
@@ -859,9 +876,5 @@ __global__ void ReduceShuffle(
 #ifdef ALLMERGETIME
     return;
 #endif
-
-    auto multiple_of_128B = (final_bw - 1) / (sizeof(Huff) * 8) + 1;
-    multiple_of_128B      = ((multiple_of_128B - 1) / 32 + 1) * 32;
-    if (tix < multiple_of_128B) out[chunksize * bix + tix] = data_src[tix];
-    __syncthreads();
+    // todo what's next
 }
