@@ -10,6 +10,7 @@
  *
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include "../cuda_utils.cuh"
 
@@ -318,7 +319,7 @@ __device__ void FindViolating() {}
  * @return __global__
  */
 template <typename Input, typename Dict, typename Huff, int Magnitude, int ReductionFactor, int ShuffleFactor>
-__global__ void ReduceShuffle(
+__global__ void ReduceShuffle_old(
     Input*    in,
     size_t    len,
     Dict*     cb,
@@ -517,6 +518,141 @@ __global__ void ReduceShuffle(
 //  16             23.7 -> 24     15.7
 // dense_h array: storing huffman bitstream
 
+// every contiguous 16/8/4/2 data points to 1 thread
+template <typename Input, typename Dict, typename Huff, typename Int, int Magnitude, int ReductionFactor>
+__device__ void LoadFromGlobalMemoryAndMergeOnce_v1(
+    Input* in,
+    size_t len,  // TODO handle later
+    Dict*  cb,
+    // size_t cb_len  // useless for now
+    volatile Huff* data_buff,
+    volatile Int*  bw_buff)
+{  // TODO another version, n threads to fill cacheline
+    constexpr unsigned int chunksize = 1 << Magnitude;
+    if (ReductionFactor - 1 == 3) {
+        auto lidx = 16 * tix;
+        auto gidx = chunksize * bix + lidx;
+
+        Dict lsym0 = cb[in[gidx + 0x0]], rsym0 = cb[in[gidx + 0x1]];
+        Dict lsym1 = cb[in[gidx + 0x2]], rsym1 = cb[in[gidx + 0x3]];
+        Dict lsym2 = cb[in[gidx + 0x4]], rsym2 = cb[in[gidx + 0x5]];
+        Dict lsym3 = cb[in[gidx + 0x6]], rsym3 = cb[in[gidx + 0x7]];
+        Dict lsym4 = cb[in[gidx + 0x8]], rsym4 = cb[in[gidx + 0x9]];
+        Dict lsym5 = cb[in[gidx + 0xa]], rsym5 = cb[in[gidx + 0xb]];
+        Dict lsym6 = cb[in[gidx + 0xc]], rsym6 = cb[in[gidx + 0xd]];
+        Dict lsym7 = cb[in[gidx + 0xe]], rsym7 = cb[in[gidx + 0xf]];
+
+        Int lbw0 = GetBitwidth(lsym0), rbw0 = GetBitwidth(rsym0);
+        Int lbw1 = GetBitwidth(lsym1), rbw1 = GetBitwidth(rsym1);
+        Int lbw2 = GetBitwidth(lsym2), rbw2 = GetBitwidth(rsym2);
+        Int lbw3 = GetBitwidth(lsym3), rbw3 = GetBitwidth(rsym3);
+        Int lbw4 = GetBitwidth(lsym4), rbw4 = GetBitwidth(rsym4);
+        Int lbw5 = GetBitwidth(lsym5), rbw5 = GetBitwidth(rsym5);
+        Int lbw6 = GetBitwidth(lsym6), rbw6 = GetBitwidth(rsym6);
+        Int lbw7 = GetBitwidth(lsym7), rbw7 = GetBitwidth(rsym7);
+
+        lsym0 <<= sizeof(Huff) * 8 - lbw0, rsym0 <<= sizeof(Huff) * 8 - rbw0;
+        lsym1 <<= sizeof(Huff) * 8 - lbw1, rsym1 <<= sizeof(Huff) * 8 - rbw1;
+        lsym2 <<= sizeof(Huff) * 8 - lbw2, rsym2 <<= sizeof(Huff) * 8 - rbw2;
+        lsym3 <<= sizeof(Huff) * 8 - lbw3, rsym3 <<= sizeof(Huff) * 8 - rbw3;
+        lsym4 <<= sizeof(Huff) * 8 - lbw4, rsym4 <<= sizeof(Huff) * 8 - rbw4;
+        lsym5 <<= sizeof(Huff) * 8 - lbw5, rsym5 <<= sizeof(Huff) * 8 - rbw5;
+        lsym6 <<= sizeof(Huff) * 8 - lbw6, rsym6 <<= sizeof(Huff) * 8 - rbw6;
+        lsym7 <<= sizeof(Huff) * 8 - lbw7, rsym7 <<= sizeof(Huff) * 8 - rbw7;
+
+        data_buff[(lidx + 0 * 2) >> 1] = lsym0 | (rsym0 >> lbw0);
+        data_buff[(lidx + 1 * 2) >> 1] = lsym1 | (rsym1 >> lbw1);
+        data_buff[(lidx + 2 * 2) >> 1] = lsym2 | (rsym2 >> lbw2);
+        data_buff[(lidx + 3 * 2) >> 1] = lsym3 | (rsym3 >> lbw3);
+        data_buff[(lidx + 4 * 2) >> 1] = lsym4 | (rsym4 >> lbw4);
+        data_buff[(lidx + 5 * 2) >> 1] = lsym5 | (rsym5 >> lbw5);
+        data_buff[(lidx + 6 * 2) >> 1] = lsym6 | (rsym6 >> lbw6);
+        data_buff[(lidx + 7 * 2) >> 1] = lsym7 | (rsym7 >> lbw7);
+
+        bw_buff[(lidx + 0 * 2) >> 1] = lbw0 + rbw0;
+        bw_buff[(lidx + 1 * 2) >> 1] = lbw1 + rbw1;
+        bw_buff[(lidx + 2 * 2) >> 1] = lbw2 + rbw2;
+        bw_buff[(lidx + 3 * 2) >> 1] = lbw3 + rbw3;
+        bw_buff[(lidx + 4 * 2) >> 1] = lbw4 + rbw4;
+        bw_buff[(lidx + 5 * 2) >> 1] = lbw5 + rbw5;
+        bw_buff[(lidx + 6 * 2) >> 1] = lbw6 + rbw6;
+        bw_buff[(lidx + 7 * 2) >> 1] = lbw7 + rbw7;
+
+        __syncthreads();
+    }
+    else if (ReductionFactor - 1 == 2) {
+        auto lidx = 8 * tix;
+        auto gidx = chunksize * bix + lidx;
+
+        Dict lsym0 = cb[in[gidx + 0x0]], rsym0 = cb[in[gidx + 0x1]];
+        Dict lsym1 = cb[in[gidx + 0x2]], rsym1 = cb[in[gidx + 0x3]];
+        Dict lsym2 = cb[in[gidx + 0x4]], rsym2 = cb[in[gidx + 0x5]];
+        Dict lsym3 = cb[in[gidx + 0x6]], rsym3 = cb[in[gidx + 0x7]];
+
+        Int lbw0 = GetBitwidth(lsym0), rbw0 = GetBitwidth(rsym0);
+        Int lbw1 = GetBitwidth(lsym1), rbw1 = GetBitwidth(rsym1);
+        Int lbw2 = GetBitwidth(lsym2), rbw2 = GetBitwidth(rsym2);
+        Int lbw3 = GetBitwidth(lsym3), rbw3 = GetBitwidth(rsym3);
+
+        lsym0 <<= sizeof(Huff) * 8 - lbw0, rsym0 <<= sizeof(Huff) * 8 - rbw0;
+        lsym1 <<= sizeof(Huff) * 8 - lbw1, rsym1 <<= sizeof(Huff) * 8 - rbw1;
+        lsym2 <<= sizeof(Huff) * 8 - lbw2, rsym2 <<= sizeof(Huff) * 8 - rbw2;
+        lsym3 <<= sizeof(Huff) * 8 - lbw3, rsym3 <<= sizeof(Huff) * 8 - rbw3;
+
+        data_buff[(lidx + 0 * 2) >> 1] = lsym0 | (rsym0 >> lbw0);
+        data_buff[(lidx + 1 * 2) >> 1] = lsym1 | (rsym1 >> lbw1);
+        data_buff[(lidx + 2 * 2) >> 1] = lsym2 | (rsym2 >> lbw2);
+        data_buff[(lidx + 3 * 2) >> 1] = lsym3 | (rsym3 >> lbw3);
+
+        bw_buff[(lidx + 0 * 2) >> 1] = lbw0 + rbw0;
+        bw_buff[(lidx + 1 * 2) >> 1] = lbw1 + rbw1;
+        bw_buff[(lidx + 2 * 2) >> 1] = lbw2 + rbw2;
+        bw_buff[(lidx + 3 * 2) >> 1] = lbw3 + rbw3;
+
+        __syncthreads();
+    }
+    else if (ReductionFactor - 1 == 1) {
+        auto lidx = 4 * tix;
+        auto gidx = chunksize * bix + lidx;
+
+        Dict lsym0 = cb[in[gidx + 0x0]], rsym0 = cb[in[gidx + 0x1]];
+        Dict lsym1 = cb[in[gidx + 0x2]], rsym1 = cb[in[gidx + 0x3]];
+
+        Int lbw0 = GetBitwidth(lsym0), rbw0 = GetBitwidth(rsym0);
+        Int lbw1 = GetBitwidth(lsym1), rbw1 = GetBitwidth(rsym1);
+
+        lsym0 <<= sizeof(Huff) * 8 - lbw0, rsym0 <<= sizeof(Huff) * 8 - rbw0;
+        lsym1 <<= sizeof(Huff) * 8 - lbw1, rsym1 <<= sizeof(Huff) * 8 - rbw1;
+
+        data_buff[(lidx + 0 * 2) >> 1] = lsym0 | (rsym0 >> lbw0);
+        data_buff[(lidx + 1 * 2) >> 1] = lsym1 | (rsym1 >> lbw1);
+
+        bw_buff[(lidx + 0 * 2) >> 1] = lbw0 + rbw0;
+        bw_buff[(lidx + 1 * 2) >> 1] = lbw1 + rbw1;
+
+        __syncthreads();
+    }
+    else if (ReductionFactor - 1 == 0) {
+        auto lidx = 4 * tix;
+        auto gidx = chunksize * bix + lidx;
+
+        Dict lsym0 = cb[in[gidx + 0x0]], rsym0 = cb[in[gidx + 0x1]];
+
+        Int lbw0 = GetBitwidth(lsym0), rbw0 = GetBitwidth(rsym0);
+
+        lsym0 <<= sizeof(Huff) * 8 - lbw0, rsym0 <<= sizeof(Huff) * 8 - rbw0;
+
+        data_buff[(lidx + 0 * 2) >> 1] = lsym0 | (rsym0 >> lbw0);
+
+        bw_buff[(lidx + 0 * 2) >> 1] = lbw0 + rbw0;
+
+        __syncthreads();
+    }
+}
+
+    }
+}
+
 /**
  * @brief Reduction for ReductionFactor times, and shuffle-merge for ShuffleFactor times
       input
@@ -547,9 +683,8 @@ __global__ void ReduceShuffle(
     char*     rich_dbg = nullptr,
     uint32_t  dbg_bi   = 3)
 {
-    static_assert(
-        Magnitude == ReductionFactor + ShuffleFactor, "Data magnitude not equal to (shuffle + reduction) factor");
-    static_assert(ReductionFactor >= 1, "Reduction Factor must be >= 1, otherwise, you lose the point of compression.");
+    static_assert(Magnitude == ReductionFactor + ShuffleFactor, "magnitude != (shuffle + reduction) factor");
+    static_assert(ReductionFactor >= 1, "RF must be >= 1, otherwise, you lose the point of compression.");
     static_assert((2 << Magnitude) < 98304, "Shared memory used too much.");
 
     extern __shared__ char __buff[];
@@ -558,41 +693,24 @@ __global__ void ReduceShuffle(
 
     auto __data = reinterpret_cast<Huff*>(__buff);
     auto __bw = reinterpret_cast<int*>(__buff + (chunksize / 2 + chunksize / 4) * sizeof(Huff));  // todo int->template
-    auto data_src = __data;                  // 1st data zone of (chunksize/2)
-    auto data_dst = __data + chunksize / 2;  // 2nd data zone of (chunksize/4)
-    auto data_exc = data_src;                // swap zone
-    auto bw_src   = __bw;                    // 1st bw zone of (chunksize/2)
-    auto bw_dst   = __bw + chunksize / 2;    // 2nd bw zone of (chunksize/4)
-    auto bw_exc   = bw_src;                  // swap zone
-    auto violating =
-        __buff + chunksize * 3 / 4 * (sizeof(Huff) + sizeof(int));  // zone of 1<< (Magnitude - ReductionFactor)
+    auto data_src  = __data;                                                     // 1st data zone of (chunksize/2)
+    auto data_dst  = __data + chunksize / 2;                                     // 2nd data zone of (chunksize/4)
+    auto data_exc  = data_src;                                                   // swap zone
+    auto bw_src    = __bw;                                                       // 1st bw zone of (chunksize/2)
+    auto bw_dst    = __bw + chunksize / 2;                                       // 2nd bw zone of (chunksize/4)
+    auto bw_exc    = bw_src;                                                     // swap zone
+    auto violating = __buff + chunksize * 3 / 4 * (sizeof(Huff) + sizeof(int));  // zone of 1<< (Magnitude - RF)
 
-    //// Reduction I: detach metadata and code; merge as much as possible
-    ////////////////////////////////////////////////////////////////////////////////
-    for (auto r = 0; r < (1 << (ReductionFactor - 1)); r++) {  // ReductionFactor - 1 = 2, 8 -> 4 (1 time)
-        auto lidx = 2 * (tix + n_worker * r);                  // every two
-        auto gidx = chunksize * bix + lidx;                    // to load from global memory
-
-        auto lsym = cb[in[gidx]];
-        auto rsym = cb[in[gidx + 1]];  // the next one
-        __syncthreads();
-
-        auto lbw = GetBitwidth(lsym);
-        auto rbw = GetBitwidth(rsym);
-        lsym <<= sizeof(Dict) * 8 - lbw;  // left aligned
-        rsym <<= sizeof(Dict) * 8 - rbw;  //
-
-        data_src[lidx >> 1] = lsym | (rsym >> lbw);  //
-        bw_src[lidx >> 1]   = lbw + rbw;             // sum bitwidths
-    }
-    __syncthreads();
+    // Reduction I: detach metadata and code; merge as much as possible
+    LoadFromGlobalMemoryAndMergeOnce_v1                       //
+        <Input, Dict, Huff, int, Magnitude, ReductionFactor>  //
+        (in, len, cb, data_src, bw_src);
 
 #ifdef REDUCE1TIME
     return;
 #endif
 
-    //// Reduction II: merge as much as possible
-    ////////////////////////////////////////////////////////////////////////////////
+    // Reduction II: merge as much as possible
     for (auto rf = ReductionFactor - 2; rf >= 0; rf--) {  // ReductionFactor - 2 = 1, 4 -> 2 -> 1 (2 times)
         auto repeat = 1 << rf;
         for (auto r = 0; r < repeat; r++) {
