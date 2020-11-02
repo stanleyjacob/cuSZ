@@ -26,29 +26,6 @@ extern __shared__ char scratch[];
 namespace cusz {
 namespace predictor_quantizer {
 
-template <int Block, typename Data, typename Quant>
-__global__ void c_lorenzo_1d1l(struct Metadata<Block>* m, Data* d, Quant* q);
-
-template <int Block, typename Data, typename Quant>
-__global__ void c_lorenzo_2d1l(struct Metadata<Block>* m, Data* d, Quant* q);
-
-template <int Block, typename Data, typename Quant>
-__global__ void c_lorenzo_3d1l(struct Metadata<Block>* m, Data* d, Quant* q);
-
-template <int Block, typename Data, typename Quant>
-__global__ void x_lorenzo_1d1l(struct Metadata<Block>* m, Data* xd, Data* outlier, Quant* q);
-
-template <int Block, typename Data, typename Quant>
-__global__ void x_lorenzo_2d1l(struct Metadata<Block>* m, Data* xd, Data* outlier, Quant* q);
-
-template <int Block, typename Data, typename Quant>
-__global__ void x_lorenzo_3d1l(struct Metadata<Block>* m, Data* xd, Data* outlier, Quant* q);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 template <typename Data, typename Quant, int B = 32>
 __global__ void c_lorenzo_1d1l(Data* d, Quant* q, size_t const* dims, double const* precisions);
 

@@ -9,7 +9,7 @@
  *
  */
 
-#include "cusz_dualquant.cuh"
+#include "cusz_dualquant2.cuh"
 #include "metadata.hh"
 
 namespace zip {

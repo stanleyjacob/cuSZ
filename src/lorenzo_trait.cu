@@ -10,7 +10,7 @@
  */
 
 #include "cusz_dryrun.cuh"
-#include "cusz_dualquant.cuh"
+#include "cusz_dualquant2.cuh"
 #include "lorenzo_trait.cuh"
 
 #if __cplusplus >= 201703L
