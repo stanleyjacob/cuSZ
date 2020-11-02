@@ -16,8 +16,8 @@
 #include <string>
 #include <unordered_map>
 
-#include "constants.hh"
-#include "types.hh"
+#include "deprecated_constants.hh"
+#include "deprecated_types.hh"
 
 size_t* InitializeDemoDims(
     std::string const& datum,
