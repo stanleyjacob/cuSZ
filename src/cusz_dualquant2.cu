@@ -119,6 +119,7 @@ __global__ void cusz::predictor_quantizer::x_lorenzo_1d1l(struct Metadata<Block>
     // end of body //
 }
 
+// TODO auto->size_t
 template <int Block, typename Data, typename Quant>
 __global__ void cusz::predictor_quantizer::x_lorenzo_2d1l(struct Metadata<Block>* m, Data* xd, Data* outlier, Quant* q)
 {
