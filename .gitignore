@@ -38,6 +38,9 @@ src/*.o
 .idea/
 .vs/
 .vscode/
+CMakeCache.txt
+CMakeFiles
+build
 
 a.out
 tags

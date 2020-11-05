@@ -268,7 +268,7 @@ Quant* lossless::interface::HuffmanDecode(
     auto d_xbcode          = mem::CreateCUDASpace<Quant>(len);
     auto d_dHcode          = mem::CreateDeviceSpaceAndMemcpyFromHost(hcode, total_uInts);
     auto d_hcode_meta      = mem::CreateDeviceSpaceAndMemcpyFromHost(dH_meta, 2 * n_chunk);
-    auto d_canon_singleton = mem::CreateDeviceSpaceAndMemcpyFromHost(canon_singleton, d_hcode_meta);
+    auto d_canon_singleton = mem::CreateDeviceSpaceAndMemcpyFromHost(canon_singleton, canon_meta);
     cudaDeviceSynchronize();
 
     lossless::wrap::Decode<<<grid_dim, block_dim, canon_meta>>>(  //
