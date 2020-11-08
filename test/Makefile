@@ -13,8 +13,8 @@ sparse:
 	nvcc -std=c++14 -I../src/ test_skewness.cu impl_mem.o -lcusparse -o test_skewness
 
 argparse:
-	g++ -c ../src/format.cc 
-	g++ -c ../src/argparse2.cc 
-	g++ -c ../src/argparse2_doc.cc 
-	g++ -c ../src/argparse2_cusz.cc 
-	g++ test_argparse.cc -I../src format.o argparse2.o argparse2_cusz.o argparse2_doc.o -o test_argparse
+	g++ -std=c++14 -c ../src/format.cc 
+	g++ -std=c++14 -c ../src/argparse2.cc 
+	g++ -std=c++14 -c ../src/argparse2_doc.cc 
+	g++ -std=c++14 -c ../src/argparse2_cusz.cc 
+	g++ -std=c++14 test_argparse.cc -I../src format.o argparse2.o argparse2_cusz.o argparse2_doc.o -o test_argparse
