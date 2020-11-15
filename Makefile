@@ -66,6 +66,7 @@ _DEPS_OLDENC := $(SRC_DIR)/huffman_codec.o $(SRC_DIR)/par_huffman.o $(SRC_DIR)/p
 DEPS_HUFF := $(_DEPS_MEM) $(_DEPS_HIST) $(_DEPS_OLDENC) $(_DEPS_ARG)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 HUFF_DIR   := $(SRC_DIR)/huffre
 
@@ -77,6 +78,9 @@ DEPS_HUFF := $(_DEPS_MEM) $(_DEPS_HIST) $(_DEPS_OLDENC) $(_DEPS_ARG)
 =======
 HUFF_DIR := src/huffre
 >>>>>>> fix; change magnitude; rename type
+=======
+HUFF_DIR := src/huffre
+>>>>>>> d0102f5a4a79164e63dbd6a8afd91de75911afb1
 
 huff: $(HUFF_DIR)/huff.cu $(SRC_DIR)/argparse.cc
 	$(NVCC) $(NVCCFLAGS) $(DEPS_HUFF) $(HUFF_DIR)/huff.cu -o huff
@@ -93,7 +97,10 @@ huffretime: $(HUFF_DIR)/rs_merge.cuh $(HUFF_DIR)/huffre.cu
 huffredbg: $(HUFF_DIR)/rs_merge.cuh $(HUFF_DIR)/huffre.cu
 	$(NVCC) $(NVCNVCCFLAGS_HUFFCFLAGS) $(CUDA_DBG) $(DEPS_HUFF) $(HUFF_DIR)/huffre.cu -o huffre-dbg -DDBG0,DBG1,DBG2
 
+<<<<<<< HEAD
 >>>>>>> add "Huffman (re)"
+=======
+>>>>>>> d0102f5a4a79164e63dbd6a8afd91de75911afb1
 install: bin/cusz
 	cp bin/cusz /usr/local/bin
 
